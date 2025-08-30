@@ -1,12 +1,16 @@
 {
-  "name": "my-v0-project",
+  "name": "prism-hub",
   "version": "0.1.0",
+  "description": "Enterprise Management Console - Multi-tenant workspace management platform",
+  "author": "Prism Hub Team",
+  "license": "MIT",
   "private": true,
   "scripts": {
     "build": "next build",
     "dev": "WATCHPACK_POLLING=true next dev",
     "lint": "next lint",
-    "start": "next start"
+    "start": "next start",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@casl/ability": "^6.7.3",
