@@ -60,19 +60,42 @@ export interface AppError {
 
 /**
  * 创建成功结果
+ * @overload 无参数时返回 void 类型的成功结果
+ * @overload 有参数时返回指定类型的成功结果
  */
-export function Ok<T = void>(data: T): Result<T, never> {
-  return { success: true, data }
+export function Ok(): Result<void, never>
+export function Ok<T>(data: T): Result<T, never>
+export function Ok<T>(data?: T): Result<T | void, never> {
+  if (arguments.length === 0) {
+    return { success: true, data: undefined as any }
+  }
+  return { success: true, data: data! }
 }
 
 /**
  * 创建成功结果（带重定向）
+ * @overload 只传重定向 URL
+ * @overload 传数据和重定向 URL
  */
-export function OkWithRedirect<T = void>(
-  data: T, 
+export function OkWithRedirect(redirectTo: string): ResultWithRedirect<void, never>
+export function OkWithRedirect<T>(data: T, redirectTo: string): ResultWithRedirect<T, never>
+export function OkWithRedirect<T>(
+  dataOrRedirectTo: T | string, 
   redirectTo?: string
-): ResultWithRedirect<T, never> {
-  return { success: true, data, redirectTo }
+): ResultWithRedirect<T | void, never> {
+  // 如果只有一个参数且是字符串，则作为 redirectTo
+  if (arguments.length === 1 && typeof dataOrRedirectTo === 'string') {
+    return { success: true, data: undefined as any, redirectTo: dataOrRedirectTo }
+  }
+  // 否则第一个参数是 data，第二个是 redirectTo
+  return { success: true, data: dataOrRedirectTo as T, redirectTo }
+}
+
+/**
+ * 创建仅包含重定向的成功结果（语义化别名）
+ */
+export function Redirect(to: string): ResultWithRedirect<void, never> {
+  return { success: true, data: undefined as any, redirectTo: to }
 }
 
 /**

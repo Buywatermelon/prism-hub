@@ -165,7 +165,7 @@ export async function signIn(
   data: FormData
 ): Promise<ResultWithRedirect<void, AppError>> {
   if (success) {
-    return OkWithRedirect(undefined, '/dashboard')
+    return Redirect('/dashboard')  // 更简洁！
   }
   return Err(createError('AUTH_FAILED', '登录失败'))
 }
@@ -227,9 +227,10 @@ if (result.success) {
 ### 工具函数
 ```typescript
 // 基础工具
-Ok(data)                    // 创建成功结果
+Ok()                        // 创建无数据的成功结果
+Ok(data)                    // 创建带数据的成功结果
 Err(error)                  // 创建失败结果
-OkWithRedirect(data, url)   // 成功结果带重定向
+Redirect(url)               // 创建仅重定向的成功结果
 
 // 错误创建
 createError(code, message, details?)  // 创建标准错误

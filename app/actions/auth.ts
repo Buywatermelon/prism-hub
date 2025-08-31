@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { 
   ResultWithRedirect, 
   AppError, 
-  OkWithRedirect, 
+  Redirect, 
   Err, 
   createError,
   Ok,
@@ -62,7 +62,7 @@ export async function signIn(
   }
 
   // 登录成功，返回成功结果带重定向
-  return OkWithRedirect(undefined, '/')
+  return Redirect('/')
 }
 
 /**
@@ -108,11 +108,11 @@ export async function signUp(
 
   if (signInError) {
     // 如果自动登录失败，让用户手动登录
-    return OkWithRedirect(undefined, '/login')
+    return Redirect('/login')
   }
 
   // 注册并登录成功，重定向到工作空间设置
-  return OkWithRedirect(undefined, '/workspace-setup')
+  return Redirect('/workspace-setup')
 }
 
 /**
@@ -153,5 +153,5 @@ export async function updatePassword(
     return Err(createError('VALIDATION_ERROR', '密码更新失败'))
   }
 
-  return Ok(undefined)
+  return Ok()
 }
