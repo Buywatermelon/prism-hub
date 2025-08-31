@@ -3,9 +3,11 @@
 ## 当前状态
 
 ### Result 模式迁移进度
-- ✅ **已完成**：`app/actions/auth.ts` (登录、注册、密码更新)
+- ✅ **已完成**：
+  - `app/actions/auth.ts` (登录、注册、密码更新)
+  - `app/workspace-setup/actions.ts` (创建、加入工作空间)
+  - `app/workspace-setup/client.tsx` (对应的客户端组件)
 - ⏳ **待迁移**：
-  - `app/workspace-setup/actions.ts`
   - `app/(workspace)/[workspaceSlug]/settings/actions.ts`
   - `app/(workspace)/[workspaceSlug]/members/actions.ts`
   - `app/(workspace)/[workspaceSlug]/providers/actions.ts`
