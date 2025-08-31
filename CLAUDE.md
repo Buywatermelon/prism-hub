@@ -137,6 +137,112 @@ prism-hub/
 - **表单验证**: Zod schema 验证
 - **友好错误**: 自定义错误类提供上下文
 
+## 🔥 异常处理规范 (Result 模式)
+
+### 核心理念
+使用 **Result 模式** 代替异常抛出，将错误处理作为正常的控制流，提供类型安全和更好的错误处理体验。
+
+### Server Actions
+- **必须**返回 `Result<T, AppError>` 类型
+- **使用工具函数**：`Ok()`, `Err()`, `OkWithRedirect()`
+- **标准错误代码**：使用预定义的 `ErrorCode` 枚举
+
+```typescript
+// ✅ 正确 - Result 模式
+import { Result, Ok, Err, createError } from '@/lib/result'
+
+export async function updateProfile(
+  data: FormData
+): Promise<Result<User, AppError>> {
+  if (!isValid) {
+    return Err(createError('VALIDATION_ERROR', '数据无效'))
+  }
+  return Ok(updatedUser)
+}
+
+// 带重定向的 Action
+export async function signIn(
+  data: FormData
+): Promise<ResultWithRedirect<void, AppError>> {
+  if (success) {
+    return OkWithRedirect(undefined, '/dashboard')
+  }
+  return Err(createError('AUTH_FAILED', '登录失败'))
+}
+```
+
+### 客户端组件
+- **无需 try-catch**：直接处理返回的 Result
+- **类型安全**：TypeScript 自动推断成功/失败类型
+- **差异化处理**：根据错误代码执行不同逻辑
+
+```typescript
+// ✅ 正确 - 处理 Result
+const result = await serverAction(formData)
+
+if (result.success) {
+  toast({ description: '操作成功' })
+  if (result.redirectTo) {
+    router.push(result.redirectTo)
+  }
+} else {
+  // 根据错误代码差异化处理
+  switch (result.error.code) {
+    case 'AUTH_FAILED':
+      router.push('/login')
+      break
+    case 'VALIDATION_ERROR':
+      form.setError('root', { message: result.error.message })
+      break
+    default:
+      toast({ 
+        description: result.error.message,
+        variant: 'destructive'
+      })
+  }
+}
+```
+
+### 标准错误代码
+```typescript
+// 认证相关
+'AUTH_FAILED'         // 认证失败
+'AUTH_REQUIRED'       // 需要登录
+'EMAIL_NOT_VERIFIED'  // 邮箱未验证
+
+// 验证相关
+'VALIDATION_ERROR'    // 输入验证失败
+'DUPLICATE_ENTRY'     // 重复数据
+
+// 业务逻辑
+'NOT_FOUND'          // 资源不存在
+'PERMISSION_DENIED'  // 权限不足
+'BUSINESS_ERROR'     // 业务错误
+
+// 系统相关
+'DATABASE_ERROR'     // 数据库错误
+'INTERNAL_ERROR'     // 内部错误
+```
+
+### 工具函数
+```typescript
+// 基础工具
+Ok(data)                    // 创建成功结果
+Err(error)                  // 创建失败结果
+OkWithRedirect(data, url)   // 成功结果带重定向
+
+// 错误创建
+createError(code, message, details?)  // 创建标准错误
+
+// 类型守卫
+isOk(result)   // 判断是否成功
+isErr(result)  // 判断是否失败
+
+// 链式操作
+mapResult(result, fn)  // 转换成功值
+mapError(result, fn)   // 转换错误值
+```
+
 ## 供应商管理
 ### 内置 OAuth 供应商
 - **Claude Code** (Anthropic CLI)

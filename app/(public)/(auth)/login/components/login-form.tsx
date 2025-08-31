@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -19,7 +20,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { signIn } from "@/app/actions/auth"
-import { handleActionError } from "@/lib/client/handle-action-error"
 
 // 表单验证 schema
 const loginSchema = z.object({
@@ -32,6 +32,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 export function LoginForm() {
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
+  const router = useRouter()
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -43,20 +44,40 @@ export function LoginForm() {
 
   async function onSubmit(values: LoginFormData) {
     startTransition(async () => {
-      try {
-        const formData = new FormData()
-        formData.set('email', values.email)
-        formData.set('password', values.password)
-        
-        await signIn(formData)
-        
-        // 登录成功后会自动重定向
+      const formData = new FormData()
+      formData.set('email', values.email)
+      formData.set('password', values.password)
+      
+      const result = await signIn(formData)
+      
+      if (result.success) {
         toast({
           title: "登录成功",
           description: "欢迎回来！",
         })
-      } catch (error) {
-        handleActionError(error)
+        
+        // 处理重定向
+        if (result.redirectTo) {
+          router.push(result.redirectTo)
+          router.refresh()
+        }
+      } else {
+        // 根据错误代码显示不同的提示
+        const { code, message } = result.error
+        
+        if (code === 'EMAIL_NOT_VERIFIED') {
+          toast({
+            title: "邮箱未验证",
+            description: message,
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "登录失败",
+            description: message,
+            variant: "destructive",
+          })
+        }
       }
     })
   }

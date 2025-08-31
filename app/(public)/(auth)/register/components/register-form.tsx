@@ -2,6 +2,7 @@
 
 import { useTransition } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -19,7 +20,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { signUp } from "@/app/actions/auth"
-import { handleActionError } from "@/lib/client/handle-action-error"
 
 // 表单验证 schema
 const registerSchema = z.object({
@@ -36,6 +36,7 @@ type RegisterFormData = z.infer<typeof registerSchema>
 export function RegisterForm() {
   const [isPending, startTransition] = useTransition()
   const { toast } = useToast()
+  const router = useRouter()
 
   const form = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -48,20 +49,40 @@ export function RegisterForm() {
 
   async function onSubmit(values: RegisterFormData) {
     startTransition(async () => {
-      try {
-        const formData = new FormData()
-        formData.set('email', values.email)
-        formData.set('password', values.password)
-        
-        await signUp(formData)
-        
-        // 注册成功后会自动重定向
+      const formData = new FormData()
+      formData.set('email', values.email)
+      formData.set('password', values.password)
+      
+      const result = await signUp(formData)
+      
+      if (result.success) {
         toast({
           title: "注册成功",
           description: "欢迎加入 Prism Hub！",
         })
-      } catch (error) {
-        handleActionError(error)
+        
+        // 处理重定向
+        if (result.redirectTo) {
+          router.push(result.redirectTo)
+          router.refresh()
+        }
+      } else {
+        // 根据错误代码显示不同的提示
+        const { code, message } = result.error
+        
+        if (code === 'DUPLICATE_ENTRY') {
+          toast({
+            title: "邮箱已存在",
+            description: message,
+            variant: "destructive",
+          })
+        } else {
+          toast({
+            title: "注册失败",
+            description: message,
+            variant: "destructive",
+          })
+        }
       }
     })
   }
