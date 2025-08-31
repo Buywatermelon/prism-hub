@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { createWorkspace, joinWorkspace } from './actions'
 import { useToast } from "@/components/ui/use-toast"
-import { handleActionError } from '@/lib/client/handle-action-error'
 import { User } from "@supabase/supabase-js"
 
 interface WorkspaceSetupClientProps {
@@ -30,20 +29,25 @@ export default function WorkspaceSetupClient({ }: WorkspaceSetupClientProps) {
     if (!workspaceName.trim()) return
 
     setIsSubmitting(true)
-    try {
-      const { workspace } = await createWorkspace({ name: workspaceName })
-      
+    
+    const result = await createWorkspace({ name: workspaceName })
+    
+    if (result.success) {
       toast({
         description: '工作空间创建成功！',
       })
       
       // 跳转到新创建的工作空间
-      router.push(`/${workspace.slug}/dashboard`)
-    } catch (error) {
-      handleActionError(error)
-    } finally {
-      setIsSubmitting(false)
+      router.push(`/${result.data.workspace.slug}/dashboard`)
+    } else {
+      toast({
+        title: '创建失败',
+        description: result.error.message,
+        variant: 'destructive',
+      })
     }
+    
+    setIsSubmitting(false)
   }
 
   // 处理加入工作空间
@@ -51,20 +55,28 @@ export default function WorkspaceSetupClient({ }: WorkspaceSetupClientProps) {
     if (!inviteCode.trim()) return
 
     setIsSubmitting(true)
-    try {
-      const { workspace } = await joinWorkspace({ join_code: inviteCode })
-      
+    
+    const result = await joinWorkspace({ join_code: inviteCode })
+    
+    if (result.success) {
       toast({
-        description: '成功加入工作空间！',
+        description: result.data.message || '成功加入工作空间！',
       })
       
-      // 跳转到新加入的工作空间
-      router.push(`/${workspace.slug}/dashboard`)
-    } catch (error) {
-      handleActionError(error)
-    } finally {
-      setIsSubmitting(false)
+      // 如果是等待审批，不跳转
+      if (!result.data.message?.includes('等待')) {
+        // 跳转到新加入的工作空间
+        router.push(`/${result.data.workspace.slug}/dashboard`)
+      }
+    } else {
+      toast({
+        title: '加入失败',
+        description: result.error.message,
+        variant: 'destructive',
+      })
     }
+    
+    setIsSubmitting(false)
   }
 
   return (
