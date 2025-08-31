@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { createWorkspace, joinWorkspace } from './actions'
 import { useToast } from "@/components/ui/use-toast"
+import { handleActionError } from '@/lib/client/handle-action-error'
 import { User } from "@supabase/supabase-js"
 
 interface WorkspaceSetupClientProps {
@@ -39,12 +40,7 @@ export default function WorkspaceSetupClient({ }: WorkspaceSetupClientProps) {
       // 跳转到新创建的工作空间
       router.push(`/${workspace.slug}/dashboard`)
     } catch (error) {
-      console.error('创建工作空间失败:', error)
-      const msg = error instanceof Error ? error.message : '创建工作空间失败'
-      toast({
-        title: msg,
-        variant: 'destructive',
-      })
+      handleActionError(error)
     } finally {
       setIsSubmitting(false)
     }
@@ -65,12 +61,7 @@ export default function WorkspaceSetupClient({ }: WorkspaceSetupClientProps) {
       // 跳转到新加入的工作空间
       router.push(`/${workspace.slug}/dashboard`)
     } catch (error) {
-      console.error('加入工作空间失败:', error)
-      const msg = error instanceof Error ? error.message : '加入工作空间失败'
-      toast({
-        title: msg,
-        variant: 'destructive',
-      })
+      handleActionError(error)
     } finally {
       setIsSubmitting(false)
     }
