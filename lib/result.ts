@@ -72,24 +72,6 @@ export function Ok<T>(data?: T): Result<T | void, never> {
   return { success: true, data: data! }
 }
 
-/**
- * 创建成功结果（带重定向）
- * @overload 只传重定向 URL
- * @overload 传数据和重定向 URL
- */
-export function OkWithRedirect(redirectTo: string): ResultWithRedirect<void, never>
-export function OkWithRedirect<T>(data: T, redirectTo: string): ResultWithRedirect<T, never>
-export function OkWithRedirect<T>(
-  dataOrRedirectTo: T | string, 
-  redirectTo?: string
-): ResultWithRedirect<T | void, never> {
-  // 如果只有一个参数且是字符串，则作为 redirectTo
-  if (arguments.length === 1 && typeof dataOrRedirectTo === 'string') {
-    return { success: true, data: undefined as any, redirectTo: dataOrRedirectTo }
-  }
-  // 否则第一个参数是 data，第二个是 redirectTo
-  return { success: true, data: dataOrRedirectTo as T, redirectTo }
-}
 
 /**
  * 创建仅包含重定向的成功结果（语义化别名）
@@ -130,55 +112,3 @@ export function isErr<T, E>(result: Result<T, E>): result is { success: false; e
   return result.success === false
 }
 
-/**
- * Result 链式调用辅助函数
- * 允许对成功结果进行转换
- */
-export function mapResult<T, U, E>(
-  result: Result<T, E>,
-  fn: (data: T) => U
-): Result<U, E> {
-  if (result.success) {
-    return Ok(fn(result.data))
-  }
-  return result
-}
-
-/**
- * Result 链式调用辅助函数
- * 允许对错误结果进行转换
- */
-export function mapError<T, E, F>(
-  result: Result<T, E>,
-  fn: (error: E) => F
-): Result<T, F> {
-  if (!result.success) {
-    return Err(fn(result.error))
-  }
-  return result
-}
-
-/**
- * 从 Result 中提取值，如果失败则抛出错误
- * 仅在确定不会失败时使用
- */
-export function unwrap<T, E>(result: Result<T, E>): T {
-  if (result.success) {
-    return result.data
-  }
-  throw new Error(
-    typeof result.error === 'object' && result.error !== null && 'message' in result.error
-      ? (result.error as any).message
-      : 'Unwrap called on error result'
-  )
-}
-
-/**
- * 从 Result 中提取值，如果失败则返回默认值
- */
-export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
-  if (result.success) {
-    return result.data
-  }
-  return defaultValue
-}
