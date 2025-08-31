@@ -4,13 +4,17 @@ import { getCurrentUser } from "@/lib/data/auth"
 import { getUserWorkspaces, getUserDefaultWorkspace } from "@/lib/data/workspace"
 import { WorkspaceLayoutClient } from "./layout-client"
 
+// 强制动态渲染，确保每次都获取最新数据
+export const dynamic = 'force-dynamic'
+
 export default async function WorkspaceLayout({
   children,
   params
 }: {
   children: React.ReactNode
-  params: { workspaceSlug?: string }
+  params: Promise<{ workspaceSlug?: string }>
 }) {
+  const resolvedParams = await params
   // 获取当前用户
   const user = await getCurrentUser()
   
@@ -30,8 +34,8 @@ export default async function WorkspaceLayout({
   // 获取当前工作空间（从 URL 或默认）
   let currentWorkspace = null
   
-  if (params.workspaceSlug) {
-    currentWorkspace = workspaces.find(w => w.workspace.slug === params.workspaceSlug)
+  if (resolvedParams.workspaceSlug) {
+    currentWorkspace = workspaces.find(w => w.workspace.slug === resolvedParams.workspaceSlug)
   }
   
   if (!currentWorkspace) {

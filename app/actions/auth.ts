@@ -31,7 +31,7 @@ export async function signIn(formData: FormData) {
   const { email, password } = parsed.data
   const supabase = await createClient()
 
-  const { error, data } = await supabase.auth.signInWithPassword({
+  const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
@@ -106,6 +106,7 @@ export async function signOut() {
   
   if (error) {
     console.error('Sign out error:', error)
+    throw new Error('登出失败，请稍后重试')
   }
 
   redirect('/login')

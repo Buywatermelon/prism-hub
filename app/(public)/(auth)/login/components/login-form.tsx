@@ -1,8 +1,7 @@
 "use client"
 
-import { useState, useTransition } from "react"
+import { useTransition } from "react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -32,12 +31,7 @@ type LoginFormData = z.infer<typeof loginSchema>
 
 export function LoginForm() {
   const [isPending, startTransition] = useTransition()
-  const router = useRouter()
-  const searchParams = useSearchParams()
   const { toast } = useToast()
-  
-  // 获取重定向 URL
-  const redirectTo = searchParams.get("redirectTo") || "/dashboard"
 
   const form = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),

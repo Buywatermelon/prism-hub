@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/components/ui/use-toast'
 import { updateWorkspace as updateWorkspaceAction } from './actions'
-import { useCurrentWorkspace, Can, useAbility } from '@/hooks'
+import { useAbility } from '@/hooks'
+import type { WorkspaceMembership } from '@/lib/data/workspace'
 
 interface WorkspaceSettings {
   name: string
@@ -19,30 +20,23 @@ interface WorkspaceSettings {
   requireApproval: boolean
 }
 
-export default function WorkspaceSettingsPage() {
-  const currentWorkspace = useCurrentWorkspace()
+interface SettingsClientProps {
+  workspace: WorkspaceMembership
+}
+
+export default function SettingsClient({ workspace }: SettingsClientProps) {
   const ability = useAbility()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  
+  // 初始化设置，直接从 props 获取
   const [settings, setSettings] = useState<WorkspaceSettings>({
-    name: '',
-    description: '',
-    requireApproval: false,
+    name: workspace.workspace.name,
+    description: workspace.workspace.description || '',
+    requireApproval: (workspace.workspace.settings as any)?.require_approval || false,
   })
   const [initialSettings, setInitialSettings] = useState<WorkspaceSettings>(settings)
-
-  useEffect(() => {
-    if (currentWorkspace) {
-      const loadedSettings = {
-        name: currentWorkspace.workspace.name,
-        description: currentWorkspace.workspace.description || '',
-        requireApproval: (currentWorkspace.workspace.settings as any)?.require_approval || false,
-      }
-      setSettings(loadedSettings)
-      setInitialSettings(loadedSettings)
-    }
-  }, [currentWorkspace])
 
   useEffect(() => {
     const hasChanges = JSON.stringify(settings) !== JSON.stringify(initialSettings)
@@ -54,11 +48,9 @@ export default function WorkspaceSettingsPage() {
   }
 
   const handleSave = async () => {
-    if (!currentWorkspace) return
-
     setIsLoading(true)
     try {
-      await updateWorkspaceAction(currentWorkspace.workspace.id, {
+      await updateWorkspaceAction(workspace.workspace.id, {
         name: settings.name,
         description: settings.description,
         settings: { require_approval: settings.requireApproval },
@@ -73,14 +65,6 @@ export default function WorkspaceSettingsPage() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  if (!currentWorkspace) {
-    return (
-      <div className="p-6">
-        <p className="text-gray-500">加载中...</p>
-      </div>
-    )
   }
 
   return (

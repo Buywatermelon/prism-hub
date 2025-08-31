@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS provider_credentials (
   created_by uuid REFERENCES auth.users(id),
   created_at timestamptz DEFAULT now() NOT NULL,
   updated_at timestamptz DEFAULT now() NOT NULL,
-  UNIQUE(provider_id, name)
+  last_used_at timestamptz
 );
 
 COMMENT ON TABLE provider_credentials IS '供应商凭证表，统一管理 API Keys 和 OAuth 账号';
@@ -115,6 +115,7 @@ COMMENT ON COLUMN provider_credentials.key_hint IS 'API 密钥提示信息，用
 COMMENT ON COLUMN provider_credentials.oauth_data IS 'OAuth 相关数据，包含 email、tokens、scopes 等';
 COMMENT ON COLUMN provider_credentials.config IS '凭证配置，如速率限制、特殊参数等';
 COMMENT ON COLUMN provider_credentials.created_by IS '创建者用户 ID';
+COMMENT ON COLUMN provider_credentials.last_used_at IS '最后使用时间';
 
 -- 创建凭证使用统计表（空表，后续完善）
 CREATE TABLE IF NOT EXISTS credential_usage_stats (

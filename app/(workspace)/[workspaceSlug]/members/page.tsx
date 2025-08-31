@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useCurrentWorkspace } from '@/hooks/use-workspace'
-import type { WorkspaceMember, MemberStatus, MemberRole } from './actions'
+import type { WorkspaceMember, MemberRole } from './actions'
 import { getMembers, approveMember, rejectMember, updateMemberRole, removeMember } from './actions'
 import { useToast } from '@/components/ui/use-toast'
 import {

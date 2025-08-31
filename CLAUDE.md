@@ -21,9 +21,10 @@ Prism Hub 是 Claude Relay 的企业级管理控制台，严格遵循 Next.js 15
 - **样式**: Tailwind CSS 3.4 + shadcn/ui
 - **认证**: Supabase Auth + SSR
 - **数据库**: Supabase (PostgreSQL)
-- **状态管理**: React Context + Zustand
+- **状态管理**: React Context
 - **表单**: React Hook Form + Zod
-- **数据获取**: SWR + Server Actions
+- **数据获取**: Server Actions + React Suspense
+- **工作空间**: Slugify 处理中文名称
 
 ## 开发命令
 ```bash
@@ -49,6 +50,7 @@ prism-hub/
 │   │   ├── [workspaceSlug]/  # 动态工作空间路由
 │   │   │   ├── dashboard/    # 仪表板页面
 │   │   │   ├── members/      # 成员管理页面
+│   │   │   ├── providers/    # 供应商与凭证管理
 │   │   │   └── settings/     # 设置页面
 │   │   ├── loading.tsx       # ✅ 工作空间加载状态
 │   │   └── error.tsx         # 错误边界
@@ -60,6 +62,7 @@ prism-hub/
 │   └── theme-provider.tsx    # 主题提供者
 ├── lib/                       
 │   ├── supabase/             # Supabase 客户端配置
+│   ├── oauth/                # OAuth 配置与工具
 │   ├── data/                 # 数据获取函数
 │   ├── errors.ts             # 自定义错误类
 │   └── utils.ts              # 工具函数
@@ -124,8 +127,8 @@ prism-hub/
 - **无障碍**: 遵循 ARIA 规范
 
 ### 状态管理
-- **服务器状态**: SWR 管理服务器数据
-- **客户端状态**: Zustand 管理本地状态
+- **服务器状态**: Server Actions + React Suspense
+- **客户端状态**: React Context + useState
 - **表单状态**: React Hook Form 管理表单
 
 ### 错误处理
@@ -133,6 +136,22 @@ prism-hub/
 - **Toast 提示**: 操作反馈使用 toast
 - **表单验证**: Zod schema 验证
 - **友好错误**: 自定义错误类提供上下文
+
+## 供应商管理
+### 内置 OAuth 供应商
+- **Claude Code** (Anthropic CLI)
+- **CodeX CLI** (OpenAI)  
+- **Gemini CLI** (Google)
+
+### 凭证类型
+- **OAuth**: 内置供应商专用，自动创建
+- **API 密钥**: 用户自定义供应商
+
+### OAuth 流程
+1. 生成授权 URL（支持 PKCE）
+2. 用户授权后复制回调 URL
+3. 自动提取授权码并交换令牌
+4. 凭证自动保存
 
 ## 部署
 - **平台**: Vercel Edge Runtime

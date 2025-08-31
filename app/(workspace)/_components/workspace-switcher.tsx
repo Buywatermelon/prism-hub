@@ -19,7 +19,7 @@ const getInitials = (name: string) =>
   name.split(' ').map(word => word[0]).join('').toUpperCase().slice(0, 2)
 
 export function WorkspaceSwitcher() {
-  const { workspaces, currentWorkspace, isPending } = useWorkspaceContext()
+  const { currentWorkspace, isPending } = useWorkspaceContext()
   const [dialogOpen, setDialogOpen] = useState(false)
 
   // 加载状态

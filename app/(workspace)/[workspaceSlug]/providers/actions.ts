@@ -1,16 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { revalidatePath } from 'next/cache'
-import { Database } from '@/types/database.types'
-
-type Provider = Database['public']['Tables']['providers']['Row']
-type ProviderInsert = Database['public']['Tables']['providers']['Insert']
-type ProviderUpdate = Database['public']['Tables']['providers']['Update']
-
-type Credential = Database['public']['Tables']['provider_credentials']['Row']
-type CredentialInsert = Database['public']['Tables']['provider_credentials']['Insert']
-type CredentialUpdate = Database['public']['Tables']['provider_credentials']['Update']
+import { Provider, ProviderInsert, ProviderUpdate, CredentialInsert, CredentialUpdate } from './types'
 
 // ==================== Provider Actions ====================
 
@@ -64,10 +55,14 @@ export async function createProvider(workspaceId: string, provider: Omit<Provide
 
   if (error) {
     console.error('Error creating provider:', error)
+    // 处理重复名称错误
+    if (error.code === '23505') {
+      return { error: `已存在名为 "${provider.name}" 的供应商，请使用其他名称` }
+    }
     return { error: error.message }
   }
 
-  revalidatePath(`/[workspaceSlug]/providers`)
+  // 不调用 revalidatePath，依赖客户端的乐观更新
   return { data }
 }
 
@@ -98,27 +93,17 @@ export async function updateProvider(providerId: string, updates: ProviderUpdate
     return { error: error.message }
   }
 
-  revalidatePath(`/[workspaceSlug]/providers`)
+  // 不调用 revalidatePath，依赖客户端的乐观更新
   return { data }
 }
 
 /**
- * 删除供应商
+ * 删除供应商（会级联删除所有相关凭证）
  */
 export async function deleteProvider(providerId: string) {
   const supabase = await createClient()
   
-  // 检查是否有关联的凭证
-  const { count } = await supabase
-    .from('provider_credentials')
-    .select('*', { count: 'exact', head: true })
-    .eq('provider_id', providerId)
-
-  if (count && count > 0) {
-    return { error: `Cannot delete provider with ${count} active credential(s). Please delete credentials first.` }
-  }
-
-  // 删除供应商
+  // 直接删除供应商（数据库设置了 ON DELETE CASCADE，会自动删除关联的凭证）
   const { error } = await supabase
     .from('providers')
     .delete()
@@ -129,7 +114,7 @@ export async function deleteProvider(providerId: string) {
     return { error: error.message }
   }
 
-  revalidatePath(`/[workspaceSlug]/providers`)
+  // 不调用 revalidatePath，依赖客户端的乐观更新
   return { success: true }
 }
 
@@ -152,10 +137,11 @@ export async function getCredentials(workspaceId: string) {
     return []
   }
 
-  // 隐藏敏感信息
+  // 返回凭证数据，包括完整的API密钥
   return data.map(credential => ({
     ...credential,
-    encrypted_key: undefined,
+    api_key: credential.encrypted_key, // 将encrypted_key作为明文api_key返回
+    encrypted_key: undefined, // 移除原字段
     key_hint: credential.key_hint || maskApiKey(credential.encrypted_key)
   }))
 }
@@ -177,10 +163,11 @@ export async function getCredentialsByProvider(providerId: string) {
     return []
   }
 
-  // 隐藏敏感信息
+  // 返回凭证数据，包括完整的API密钥
   return data.map(credential => ({
     ...credential,
-    encrypted_key: undefined,
+    api_key: credential.encrypted_key, // 将encrypted_key作为明文api_key返回
+    encrypted_key: undefined, // 移除原字段
     key_hint: credential.key_hint || maskApiKey(credential.encrypted_key)
   }))
 }
@@ -201,11 +188,11 @@ export async function createCredential(
     return { error: 'Unauthorized' }
   }
 
-  // 处理API密钥 - 生成提示信息
+  // 处理API密钥 - 生成提示信息（不加密，直接存储）
   let keyHint = ''
   if (credential.credential_type === 'api_key' && credential.encrypted_key) {
     keyHint = maskApiKey(credential.encrypted_key)
-    // TODO: 实际应该加密存储，这里暂时明文存储
+    // 直接明文存储API密钥
   }
 
   // 创建凭证
@@ -227,8 +214,16 @@ export async function createCredential(
     return { error: error.message }
   }
 
-  revalidatePath(`/[workspaceSlug]/providers`)
-  return { data }
+  // 返回完整数据，包括API密钥
+  const result = {
+    ...data,
+    api_key: data.encrypted_key, // 将encrypted_key作为api_key返回
+    encrypted_key: undefined,
+    key_hint: data.key_hint || keyHint
+  }
+
+  // 不调用 revalidatePath，依赖客户端的乐观更新
+  return { data: result }
 }
 
 /**
@@ -240,7 +235,7 @@ export async function updateCredential(credentialId: string, updates: Credential
   // 如果更新了密钥，重新生成提示信息
   if (updates.encrypted_key) {
     updates.key_hint = maskApiKey(updates.encrypted_key)
-    // TODO: 实际应该加密存储
+    // 直接明文存储，不加密
   }
 
   // 更新凭证
@@ -259,8 +254,16 @@ export async function updateCredential(credentialId: string, updates: Credential
     return { error: error.message }
   }
 
-  revalidatePath(`/[workspaceSlug]/providers`)
-  return { data }
+  // 返回完整数据，包括API密钥
+  const result = {
+    ...data,
+    api_key: data.encrypted_key, // 将encrypted_key作为api_key返回
+    encrypted_key: undefined,
+    key_hint: data.key_hint
+  }
+
+  // 不调用 revalidatePath，依赖客户端的乐观更新
+  return { data: result }
 }
 
 /**
@@ -279,7 +282,7 @@ export async function deleteCredential(credentialId: string) {
     return { error: error.message }
   }
 
-  revalidatePath(`/[workspaceSlug]/providers`)
+  // 不调用 revalidatePath，依赖客户端的乐观更新
   return { success: true }
 }
 
@@ -307,9 +310,21 @@ function inferProviderType(endpoint: string): 'openai' | 'claude' | 'gemini' {
  * 掩码 API 密钥用于显示
  */
 function maskApiKey(key: string | null): string {
-  if (!key || key.length < 8) return '***'
+  if (!key || key.length < 8) return 'sk-***'
   
-  const prefix = key.substring(0, 3)
-  const suffix = key.substring(key.length - 4)
-  return `${prefix}...${suffix}`
+  // 检测密钥类型并生成合适的掩码
+  if (key.startsWith('sk-')) {
+    // OpenAI 风格的密钥
+    const suffix = key.substring(key.length - 4)
+    return `sk-****${suffix}`
+  } else if (key.startsWith('gsk_')) {
+    // Groq 风格的密钥
+    const suffix = key.substring(key.length - 4)
+    return `gsk_****${suffix}`
+  } else {
+    // 通用密钥格式
+    const prefix = key.substring(0, 3)
+    const suffix = key.substring(key.length - 4)
+    return `${prefix}****${suffix}`
+  }
 }

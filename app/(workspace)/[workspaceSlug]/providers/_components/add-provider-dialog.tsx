@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, ReactNode } from 'react'
+import { useState, ReactNode, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -15,23 +15,36 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { createProvider } from '../actions'
+import { useToast } from '@/components/ui/use-toast'
+import { createProvider, updateProvider } from '../actions'
 import { Database } from '@/types/database.types'
 
 type Provider = Database['public']['Tables']['providers']['Row']
 
 interface AddProviderDialogProps {
   workspaceId: string
-  onProviderAdded: (provider: Provider) => void
+  onProviderAdded?: (provider: Provider) => void
+  onProviderUpdated?: (provider: Provider) => void
   trigger?: ReactNode
+  editProvider?: Provider | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function AddProviderDialog({ 
   workspaceId, 
   onProviderAdded,
-  trigger 
+  onProviderUpdated,
+  trigger,
+  editProvider,
+  open: controlledOpen,
+  onOpenChange
 }: AddProviderDialogProps) {
-  const [open, setOpen] = useState(false)
+  const { toast } = useToast()
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = onOpenChange || setInternalOpen
+  
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
@@ -41,12 +54,38 @@ export function AddProviderDialog({
     models: '',
   })
 
+  // 编辑模式时填充表单
+  useEffect(() => {
+    if (editProvider) {
+      setFormData({
+        name: editProvider.name,
+        type: editProvider.type as 'openai' | 'claude' | 'gemini',
+        endpoint: editProvider.endpoint || '',
+        description: editProvider.description || '',
+        models: Array.isArray(editProvider.models) ? editProvider.models.join('\n') : '',
+      })
+    } else {
+      // 重置表单
+      setFormData({
+        name: '',
+        type: 'openai',
+        endpoint: '',
+        description: '',
+        models: '',
+      })
+    }
+  }, [editProvider])
+
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!formData.name.trim() || !formData.endpoint.trim()) {
-      alert('请填写必填字段')
+      toast({
+        title: '错误',
+        description: '请填写必填字段',
+        variant: 'destructive',
+      })
       return
     }
 
@@ -58,30 +97,66 @@ export function AddProviderDialog({
         .map(m => m.trim())
         .filter(Boolean)
 
-      const result = await createProvider(workspaceId, {
-        name: formData.name,
-        type: formData.type,
-        endpoint: formData.endpoint,
-        description: formData.description,
-        models: models,
-        config: {},
-        icon: null,
-        created_by: null,
-      })
-
-      if (result.error) {
-        alert(result.error)
-      } else if (result.data) {
-        onProviderAdded(result.data)
-        setOpen(false)
-        // 重置表单
-        setFormData({
-          name: '',
-          type: 'openai',
-          endpoint: '',
-          description: '',
-          models: '',
+      if (editProvider) {
+        // 更新模式
+        const result = await updateProvider(editProvider.id, {
+          name: formData.name,
+          type: formData.type,
+          endpoint: formData.endpoint,
+          description: formData.description,
+          models: models,
+          config: editProvider.config || {},
         })
+
+        if (result.error) {
+          toast({
+            title: '更新失败',
+            description: result.error,
+            variant: 'destructive',
+          })
+        } else if (result.data) {
+          toast({
+            title: '更新成功',
+            description: `供应商 ${result.data.name} 已更新`,
+          })
+          onProviderUpdated?.(result.data)
+          setOpen(false)
+        }
+      } else {
+        // 创建模式
+        const result = await createProvider(workspaceId, {
+          name: formData.name,
+          type: formData.type,
+          endpoint: formData.endpoint,
+          description: formData.description,
+          models: models,
+          config: {},
+          icon: null,
+          created_by: null,
+        })
+
+        if (result.error) {
+          toast({
+            title: '创建失败',
+            description: result.error,
+            variant: 'destructive',
+          })
+        } else if (result.data) {
+          toast({
+            title: '创建成功',
+            description: `供应商 ${result.data.name} 已添加`,
+          })
+          onProviderAdded?.(result.data)
+          setOpen(false)
+          // 重置表单
+          setFormData({
+            name: '',
+            type: 'openai',
+            endpoint: '',
+            description: '',
+            models: '',
+          })
+        }
       }
     } finally {
       setIsSubmitting(false)
@@ -114,19 +189,17 @@ export function AddProviderDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button>
-            添加Provider
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger !== null && trigger !== undefined && (
+        <DialogTrigger asChild>
+          {trigger}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>添加新的LLM Provider</DialogTitle>
+            <DialogTitle>{editProvider ? '编辑' : '添加'}LLM Provider</DialogTitle>
             <DialogDescription>
-              配置新的AI服务提供商信息
+              {editProvider ? '更新供应商配置信息' : '配置新的AI服务提供商信息'}
             </DialogDescription>
           </DialogHeader>
           
@@ -214,7 +287,8 @@ export function AddProviderDialog({
               取消
             </Button>
             <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? '添加中...' : '添加Provider'}
+              {isSubmitting ? (editProvider ? '更新中...' : '添加中...') : 
+               (editProvider ? '更新Provider' : '添加Provider')}
             </Button>
           </DialogFooter>
         </form>

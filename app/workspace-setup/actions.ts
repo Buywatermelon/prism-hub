@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
 import { AuthenticationError, ValidationError, BusinessError, DatabaseError } from '@/lib/errors'
+import slugify from 'slugify'
 
 const createWorkspaceSchema = z.object({
   name: z.string().min(2).max(50),
@@ -16,14 +17,6 @@ function generateJoinCode(): string {
     code += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return code
-}
-
-function generateSlug(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .substring(0, 50)
 }
 
 export async function createWorkspace(input: { name: string; description?: string }) {
@@ -40,16 +33,30 @@ export async function createWorkspace(input: { name: string; description?: strin
   }
   const { name, description } = parsed.data
 
-  let slug = generateSlug(name)
-  let joinCode = generateJoinCode()
-
-  let attempts = 0
-  while (attempts < 5) {
-    const { data: existing } = await supabase.from('workspaces').select('id').eq('slug', slug).single()
-    if (!existing) break
-    slug = `${generateSlug(name)}-${Date.now()}`
-    attempts++
+  // 生成 slug - slugify 会自动处理中文和特殊字符
+  let slug = slugify(name, {
+    lower: true,
+    strict: true,
+    trim: true
+  })
+  
+  // 如果 slug 为空（比如纯中文或特殊字符），使用时间戳
+  if (!slug) {
+    slug = `workspace-${Date.now()}`
   }
+  
+  // 检查是否已存在，如果存在就加时间戳
+  const { data: existing } = await supabase
+    .from('workspaces')
+    .select('id')
+    .eq('slug', slug)
+    .single()
+  
+  if (existing) {
+    slug = `${slug}-${Date.now()}`
+  }
+  
+  const joinCode = generateJoinCode()
 
   const { data: workspace, error: workspaceError } = await supabase
     .from('workspaces')
@@ -82,6 +89,15 @@ export async function createWorkspace(input: { name: string; description?: strin
     await supabase.from('workspaces').delete().eq('id', workspace.id)
     console.error('创建工作空间成员失败:', membershipError)
     throw new DatabaseError('创建工作空间成员失败', membershipError)
+  }
+
+  // 初始化内置OAuth提供商
+  try {
+    const { initBuiltinOAuthProviders } = await import('@/app/(workspace)/[workspaceSlug]/providers/oauth/actions')
+    await initBuiltinOAuthProviders(workspace.id)
+  } catch (error) {
+    console.error('初始化内置提供商失败:', error)
+    // 不阻塞工作空间创建流程
   }
 
   return { workspace, membership }

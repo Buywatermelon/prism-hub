@@ -1,6 +1,6 @@
 'use client'
 
-import { Brain } from 'lucide-react'
+import { Key, Brain } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -21,28 +21,32 @@ export function ProviderCard({
   credentialCount,
   onClick 
 }: ProviderCardProps) {
-  // 根据类型获取供应商的默认图标/颜色
-  const getProviderIcon = (type: string) => {
+
+  // 获取供应商类型的显示名称
+  const getProviderTypeLabel = (type: string) => {
     switch (type) {
-      case 'openai':
-        return '🤖'
       case 'claude':
-        return '🧠'
+        return 'Claude'
+      case 'openai':
+        return 'OpenAI'
       case 'gemini':
-        return '✨'
+        return 'Gemini'
       default:
-        return '🔌'
+        return type || 'Custom'
     }
   }
 
   // 获取模型数量
   const modelCount = Array.isArray(provider.models) ? provider.models.length : 0
+  
+  // 判断供应商是否活跃（有凭证）
+  const isActive = credentialCount > 0
 
   return (
     <div
       className={cn(
-        "p-4 cursor-pointer transition-colors hover:bg-accent",
-        isSelected && "bg-accent border-l-2 border-l-primary"
+        "p-4 cursor-pointer transition-all hover:bg-muted/50",
+        isSelected && "bg-blue-50 dark:bg-blue-900/20 border-r-2 border-r-blue-500"
       )}
       onClick={onClick}
     >
@@ -51,8 +55,8 @@ export function ProviderCard({
           {provider.icon ? (
             <AvatarImage src={provider.icon} alt={provider.name} />
           ) : null}
-          <AvatarFallback className="text-lg">
-            {getProviderIcon(provider.type)}
+          <AvatarFallback>
+            <Brain className="h-5 w-5" />
           </AvatarFallback>
         </Avatar>
         
@@ -62,10 +66,10 @@ export function ProviderCard({
               {provider.name}
             </h3>
             <Badge 
-              variant="secondary" 
+              variant={isActive ? "default" : "secondary"}
               className="text-xs"
             >
-              {provider.type}
+              {isActive ? '活跃' : '未激活'}
             </Badge>
           </div>
           
@@ -73,14 +77,21 @@ export function ProviderCard({
             {provider.description || provider.endpoint}
           </p>
           
-          <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-            <span>{credentialCount} 个凭证</span>
+          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <Key className="h-3 w-3" />
+              <span>{credentialCount} 凭证</span>
+            </div>
             {modelCount > 0 && (
               <>
                 <span>•</span>
-                <span>{modelCount} 个模型</span>
+                <span>{modelCount} 模型</span>
               </>
             )}
+            <span>•</span>
+            <Badge variant="outline" className="text-xs h-4 px-1">
+              {getProviderTypeLabel(provider.type)}
+            </Badge>
           </div>
         </div>
       </div>

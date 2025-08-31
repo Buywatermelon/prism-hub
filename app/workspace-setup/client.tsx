@@ -16,7 +16,7 @@ interface WorkspaceSetupClientProps {
   user: User
 }
 
-export default function WorkspaceSetupClient({ user }: WorkspaceSetupClientProps) {
+export default function WorkspaceSetupClient({ }: WorkspaceSetupClientProps) {
   const router = useRouter()
   const { toast } = useToast()
   const [activeTab, setActiveTab] = useState<"create" | "join">("create")

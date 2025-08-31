@@ -2,7 +2,6 @@
 
 import { useTransition } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -36,7 +35,6 @@ type RegisterFormData = z.infer<typeof registerSchema>
 
 export function RegisterForm() {
   const [isPending, startTransition] = useTransition()
-  const router = useRouter()
   const { toast } = useToast()
 
   const form = useForm<RegisterFormData>({

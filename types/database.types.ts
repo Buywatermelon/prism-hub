@@ -135,6 +135,7 @@ export type Database = {
           encrypted_key: string | null
           id: string
           key_hint: string | null
+          last_used_at: string | null
           name: string
           oauth_data: Json | null
           provider_id: string
@@ -150,6 +151,7 @@ export type Database = {
           encrypted_key?: string | null
           id?: string
           key_hint?: string | null
+          last_used_at?: string | null
           name: string
           oauth_data?: Json | null
           provider_id: string
@@ -165,6 +167,7 @@ export type Database = {
           encrypted_key?: string | null
           id?: string
           key_hint?: string | null
+          last_used_at?: string | null
           name?: string
           oauth_data?: Json | null
           provider_id?: string

@@ -6,6 +6,8 @@ import {
   HelpCircle,
   Menu,
   Building2,
+  Brain,
+  Key,
 } from "lucide-react"
 
 import { Home } from "lucide-react"
@@ -89,6 +91,20 @@ export default function Sidebar() {
                   </NavItem>
                   <NavItem href={`${prefix}/dashboard/analytics`} icon={BarChart2}>
                     数据分析
+                  </NavItem>
+                </div>
+              </div>
+
+              <div>
+                <div className="px-3 mb-2 text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  AI 配置
+                </div>
+                <div className="space-y-1">
+                  <NavItem href={`${prefix}/providers`} icon={Brain}>
+                    供应商管理
+                  </NavItem>
+                  <NavItem href={`${prefix}/api-keys`} icon={Key}>
+                    API 密钥
                   </NavItem>
                 </div>
               </div>

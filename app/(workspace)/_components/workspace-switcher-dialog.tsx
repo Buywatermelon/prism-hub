@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
-import { Check, Plus, Users2, Calendar, Building2 } from "lucide-react"
+import { Check, Plus, Users2, Calendar } from "lucide-react"
 import {
   Dialog,
   DialogContent,

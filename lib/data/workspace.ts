@@ -46,6 +46,44 @@ export async function getUserWorkspaces(userId: string): Promise<WorkspaceMember
   }))
 }
 
+export async function getWorkspaceBySlug(slug: string, userId: string): Promise<WorkspaceMembership | null> {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('workspace_members')
+    .select(`
+      *,
+      workspace:workspaces!inner(*)
+    `)
+    .eq('user_id', userId)
+    .eq('status', 'active')
+    .eq('workspace.slug', slug)
+    .single()
+  
+  if (error || !data) {
+    return null
+  }
+  
+  return {
+    workspace: data.workspace as Workspace,
+    membership: {
+      id: data.id,
+      workspace_id: data.workspace_id,
+      user_id: data.user_id,
+      role: data.role,
+      status: data.status,
+      joined_at: data.joined_at,
+      applied_at: data.applied_at,
+      approved_at: data.approved_at,
+      approved_by: data.approved_by,
+      invited_by: data.invited_by,
+      permissions: data.permissions,
+      preferences: data.preferences,
+      reject_reason: data.reject_reason,
+    } as WorkspaceMember
+  }
+}
+
 export async function getUserDefaultWorkspace(userId: string): Promise<WorkspaceMembership | null> {
   const workspaces = await getUserWorkspaces(userId)
   

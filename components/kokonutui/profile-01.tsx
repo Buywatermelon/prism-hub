@@ -38,17 +38,11 @@ export default function Profile01({
     startTransition(async () => {
       try {
         await signOut()
-        // 登出成功后会自动重定向
-        toast({
-          title: "已登出",
-          description: "期待您的再次访问",
-        })
+        // Server Action 会处理重定向
       } catch (error) {
-        toast({
-          title: "登出失败",
-          description: "请稍后重试",
-          variant: "destructive",
-        })
+        console.error('Logout error:', error)
+        // 如果 Server Action 失败，尝试直接跳转
+        router.push('/login')
       }
     })
   }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Brain, Key, MoreHorizontal, Plus, Edit, Trash2, Globe } from 'lucide-react'
+import { Key, MoreHorizontal, Plus, Edit, Trash2, Globe, Brain } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -13,22 +13,28 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { CredentialCard } from './credential-card'
 import { AddCredentialDialog } from './add-credential-dialog'
+import { AddProviderDialog } from './add-provider-dialog'
 import { deleteProvider } from '../actions'
-import { Database } from '@/types/database.types'
-
-type Provider = Database['public']['Tables']['providers']['Row']
-type Credential = Database['public']['Tables']['provider_credentials']['Row'] & {
-  encrypted_key?: never
-  key_hint: string
-}
+import { Provider, Credential } from '../types'
 
 interface ProviderDetailProps {
   provider: Provider
   credentials: Credential[]
   workspaceId: string
   onProviderDeleted: (providerId: string) => void
+  onProviderUpdated?: (provider: Provider) => void
   onCredentialsUpdated: (credentials: Credential[]) => void
 }
 
@@ -37,30 +43,16 @@ export function ProviderDetail({
   credentials,
   workspaceId,
   onProviderDeleted,
+  onProviderUpdated,
   onCredentialsUpdated,
 }: ProviderDetailProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
-  // 获取供应商图标
-  const getProviderIcon = (type: string) => {
-    switch (type) {
-      case 'openai':
-        return '🤖'
-      case 'claude':
-        return '🧠'
-      case 'gemini':
-        return '✨'
-      default:
-        return '🔌'
-    }
-  }
 
   // 处理删除供应商
   const handleDelete = async () => {
-    if (!confirm(`确定要删除供应商 "${provider.name}" 吗？此操作不可恢复。`)) {
-      return
-    }
-
     setIsDeleting(true)
     try {
       const result = await deleteProvider(provider.id)
@@ -68,6 +60,7 @@ export function ProviderDetail({
         alert(result.error)
       } else {
         onProviderDeleted(provider.id)
+        setIsDeleteDialogOpen(false)
       }
     } finally {
       setIsDeleting(false)
@@ -99,7 +92,7 @@ export function ProviderDetail({
                   <AvatarImage src={provider.icon} alt={provider.name} />
                 ) : null}
                 <AvatarFallback className="text-xl">
-                  {getProviderIcon(provider.type)}
+                  <Brain className="h-6 w-6" />
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -127,15 +120,14 @@ export function ProviderDetail({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setIsEditDialogOpen(true)}>
                   <Edit className="h-4 w-4 mr-2" />
                   编辑Provider
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-destructive"
-                  onClick={handleDelete}
-                  disabled={isDeleting || credentials.length > 0}
+                  onClick={() => setIsDeleteDialogOpen(true)}
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
                   删除Provider
@@ -177,6 +169,7 @@ export function ProviderDetail({
               workspaceId={workspaceId}
               providerId={provider.id}
               providerName={provider.name}
+              providerConfig={provider.config}
               onCredentialAdded={handleCredentialAdded}
               trigger={
                 <Button>
@@ -207,6 +200,49 @@ export function ProviderDetail({
           )}
         </CardContent>
       </Card>
+
+      {/* 编辑Provider对话框 */}
+      <AddProviderDialog
+        workspaceId={workspaceId}
+        editProvider={provider}
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        trigger={null}
+        onProviderUpdated={(updatedProvider) => {
+          onProviderUpdated?.(updatedProvider)
+          setIsEditDialogOpen(false)
+        }}
+      />
+
+      {/* 删除确认对话框 */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认删除</AlertDialogTitle>
+            <AlertDialogDescription>
+              确定要删除供应商 &ldquo;{provider.name}&rdquo; 吗？
+              <span className="block mt-2">
+                此操作不可恢复，供应商及其所有凭证将被永久删除。
+              </span>
+              {credentials.length > 0 && (
+                <span className="block mt-2 text-amber-600 dark:text-amber-500">
+                  ⚠️ 注意：该供应商下还有 {credentials.length} 个凭证也将被删除。
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? '删除中...' : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, ReactNode } from 'react'
+import { useState, ReactNode, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Brain } from 'lucide-react'
+import { Brain, Globe, Shield } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -16,100 +16,176 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { createCredential } from '../actions'
-import { Database } from '@/types/database.types'
-
-type Credential = Database['public']['Tables']['provider_credentials']['Row'] & {
-  encrypted_key?: never
-  key_hint: string
-}
+import { useToast } from '@/components/ui/use-toast'
+import { createCredential, updateCredential } from '../actions'
+import { Credential } from '../types'
+import { OAuthFlowDialog } from './oauth-flow-dialog'
 
 interface AddCredentialDialogProps {
   workspaceId: string
   providerId: string
   providerName: string
-  onCredentialAdded: (credential: Credential) => void
+  providerConfig?: any // provider的config字段
+  onCredentialAdded?: (credential: Credential) => void
+  onCredentialUpdated?: (credential: Credential) => void
   trigger?: ReactNode
+  editCredential?: Credential | null
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function AddCredentialDialog({ 
   workspaceId,
   providerId,
   providerName,
+  providerConfig,
   onCredentialAdded,
-  trigger 
+  onCredentialUpdated,
+  trigger,
+  editCredential,
+  open: controlledOpen,
+  onOpenChange
 }: AddCredentialDialogProps) {
-  const [open, setOpen] = useState(false)
+  const { toast } = useToast()
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen
+  const setOpen = onOpenChange || setInternalOpen
+  
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showOAuthDialog, setShowOAuthDialog] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     credential_type: 'api_key' as 'api_key' | 'oauth_account',
-    api_key: '',
+    api_key: ''
   })
+  
+  // 检查是否是内置提供商（内置提供商只支持OAuth）
+  const isBuiltinProvider = providerConfig?.builtin === true
+
+  // 编辑模式时填充表单
+  useEffect(() => {
+    if (editCredential) {
+      setFormData({
+        name: editCredential.name,
+        credential_type: editCredential.credential_type as 'api_key' | 'oauth_account',
+        api_key: '' // 安全起见，不显示原始密钥
+      })
+    } else {
+      // 重置表单，根据供应商类型设置默认值
+      const defaultName = isBuiltinProvider ? `${providerName} OAuth` : `${providerName} API Key`
+      setFormData({
+        name: defaultName,
+        credential_type: isBuiltinProvider ? 'oauth_account' : 'api_key',
+        api_key: ''
+      })
+    }
+  }, [editCredential, isBuiltinProvider, providerName])
 
   // 处理表单提交
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!formData.name.trim()) {
-      alert('请输入凭证名称')
+      toast({
+        title: '错误',
+        description: '请输入凭证名称',
+        variant: 'destructive',
+      })
       return
     }
 
-    if (formData.credential_type === 'api_key' && !formData.api_key.trim()) {
-      alert('请输入API密钥')
+    if (formData.credential_type === 'api_key' && !editCredential && !formData.api_key.trim()) {
+      toast({
+        title: '错误',
+        description: '请输入API密钥',
+        variant: 'destructive',
+      })
       return
     }
 
     setIsSubmitting(true)
     try {
-      const result = await createCredential(
-        workspaceId,
-        providerId,
-        {
+      if (editCredential) {
+        // 更新模式
+        const updates: Record<string, unknown> = {
           name: formData.name,
           credential_type: formData.credential_type,
-          encrypted_key: formData.credential_type === 'api_key' ? formData.api_key : null,
-          key_hint: null,
-          oauth_data: formData.credential_type === 'oauth_account' ? {} : null,
-          status: 'active',
-          config: {},
-          created_by: null,
+          status: editCredential.status,
+          config: editCredential.config || {},
         }
-      )
 
-      if (result.error) {
-        alert(result.error)
-      } else if (result.data) {
-        // 添加计算的 key_hint 以匹配类型
-        const credential: Credential = {
-          ...result.data,
-          encrypted_key: undefined,
-          key_hint: result.data.key_hint || maskApiKey(formData.api_key)
+        // 只有在输入新密钥时才更新
+        if (formData.credential_type === 'api_key' && formData.api_key) {
+          updates.encrypted_key = formData.api_key
         }
-        onCredentialAdded(credential)
-        setOpen(false)
-        // 重置表单
-        setFormData({
-          name: '',
-          credential_type: 'api_key',
-          api_key: '',
-        })
+
+        // OAuth 数据不需要更新，由 OAuth 流程管理
+
+        const result = await updateCredential(editCredential.id, updates)
+
+        if (result.error) {
+          toast({
+            title: '更新失败',
+            description: result.error,
+            variant: 'destructive',
+          })
+        } else if (result.data) {
+          toast({
+            title: '更新成功',
+            description: `凭证 ${result.data.name} 已更新`,
+          })
+          // 直接使用返回的数据，actions已经处理好了api_key字段
+          onCredentialUpdated?.(result.data as Credential)
+          setOpen(false)
+        }
+      } else {
+        // 创建模式
+        const result = await createCredential(
+          workspaceId,
+          providerId,
+          {
+            name: formData.name,
+            credential_type: formData.credential_type,
+            encrypted_key: formData.credential_type === 'api_key' ? formData.api_key : null,
+            key_hint: null,
+            oauth_data: null, // OAuth 数据由 OAuth 流程设置
+            status: 'active',
+            config: {},
+            created_by: null,
+          }
+        )
+
+        if (result.error) {
+          toast({
+            title: '创建失败',
+            description: result.error,
+            variant: 'destructive',
+          })
+        } else if (result.data) {
+          toast({
+            title: '创建成功',
+            description: `凭证 ${result.data.name} 已添加`,
+          })
+          // 直接使用返回的数据，actions已经处理好了api_key字段
+          onCredentialAdded?.(result.data as Credential)
+          setOpen(false)
+          // 重置表单
+          const defaultName = `${providerName} API Key`
+          setFormData({
+            name: defaultName,
+            credential_type: 'api_key',
+            api_key: ''
+          })
+        }
       }
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // 掩码 API 密钥
-  function maskApiKey(key: string | null): string {
-    if (!key || key.length < 8) return '***'
-    const prefix = key.substring(0, 3)
-    const suffix = key.substring(key.length - 4)
-    return `${prefix}...${suffix}`
-  }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         {trigger || (
@@ -121,9 +197,9 @@ export function AddCredentialDialog({
       <DialogContent className="sm:max-w-[500px]">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>添加认证凭证</DialogTitle>
+            <DialogTitle>{editCredential ? '编辑' : '添加'}认证凭证</DialogTitle>
             <DialogDescription>
-              为 {providerName} 添加新的认证凭证
+              {editCredential ? `更新 ${providerName} 的凭证信息` : `为 ${providerName} 添加新的认证凭证`}
             </DialogDescription>
           </DialogHeader>
           
@@ -153,52 +229,57 @@ export function AddCredentialDialog({
               />
             </div>
             
-            <div className="grid gap-2">
-              <Label htmlFor="credential-type">
-                凭证类型 <span className="text-destructive">*</span>
-              </Label>
-              <Select
-                value={formData.credential_type}
-                onValueChange={(value) => setFormData(prev => ({ 
-                  ...prev, 
-                  credential_type: value as 'api_key' | 'oauth_account' 
-                }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="api_key">API 密钥</SelectItem>
-                  <SelectItem value="oauth_account" disabled>
-                    OAuth 令牌 (暂不支持)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {formData.credential_type === 'api_key' && (
+            {/* 根据供应商类型显示不同的凭证输入 */}
+            {isBuiltinProvider ? (
+              // 内置供应商: OAuth授权
+              <div className="grid gap-2">
+                <Label>凭证类型</Label>
+                <div className="flex items-center gap-2 p-2 bg-muted rounded">
+                  <Shield className="h-4 w-4" />
+                  <span>OAuth 授权</span>
+                </div>
+                <div className="mt-4 space-y-4">
+                  <div className="p-4 border rounded-lg bg-muted/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="h-4 w-4 text-primary" />
+                      <span className="font-medium">OAuth 2.0 授权</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      点击下方按钮开始 OAuth 授权流程，将跳转到 {providerName} 进行授权
+                    </p>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        setShowOAuthDialog(true)
+                        setOpen(false)
+                      }}
+                      className="w-full"
+                    >
+                      <Globe className="h-4 w-4 mr-2" />
+                      开始 OAuth 授权
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center">
+                    授权后将自动创建凭证
+                  </p>
+                </div>
+              </div>
+            ) : (
+              // 用户添加的供应商: API密钥
               <div className="grid gap-2">
                 <Label htmlFor="api-key">
-                  API 密钥 <span className="text-destructive">*</span>
+                  API 密钥 {!editCredential && <span className="text-destructive">*</span>}
                 </Label>
-                <Input
+                <PasswordInput
                   id="api-key"
-                  type="password"
                   value={formData.api_key}
                   onChange={(e) => setFormData(prev => ({ ...prev, api_key: e.target.value }))}
-                  placeholder="sk-..."
-                  required
+                  placeholder={editCredential ? '留空保持不变' : 'sk-...'}
+                  required={!editCredential}
                 />
                 <p className="text-xs text-muted-foreground">
-                  密钥将被安全加密存储
-                </p>
-              </div>
-            )}
-            
-            {formData.credential_type === 'oauth_account' && (
-              <div className="p-4 bg-muted rounded">
-                <p className="text-sm text-muted-foreground">
-                  OAuth 认证流程暂不支持，请使用 API 密钥方式
+                  密钥将以明文形式存储（请确保数据库安全）
+                  {editCredential && '，留空表示不更改当前密钥'}
                 </p>
               </div>
             )}
@@ -213,15 +294,31 @@ export function AddCredentialDialog({
             >
               取消
             </Button>
-            <Button 
-              type="submit" 
-              disabled={isSubmitting || formData.credential_type === 'oauth_account'}
-            >
-              {isSubmitting ? '添加中...' : '添加凭证'}
-            </Button>
+            {!isBuiltinProvider && (
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting ? (editCredential ? '更新中...' : '添加中...') : 
+                 (editCredential ? '更新凭证' : '添加凭证')}
+              </Button>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+    
+    {/* OAuth 授权对话框 - 内置供应商都支持OAuth */}
+    {isBuiltinProvider && (
+      <OAuthFlowDialog
+        providerId={providerId}
+        providerName={providerName}
+        workspaceId={workspaceId}
+        open={showOAuthDialog}
+        onOpenChange={setShowOAuthDialog}
+        onSuccess={(credential) => {
+          onCredentialAdded?.(credential)
+          setShowOAuthDialog(false)
+        }}
+      />
+    )}
+    </>
   )
 }

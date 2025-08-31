@@ -2,7 +2,7 @@
 
 import React from "react"
 import { User } from "@supabase/supabase-js"
-import { createContext, useContext, useState, useTransition } from "react"
+import { createContext, useState, useTransition } from "react"
 import { useRouter } from "next/navigation"
 import type { WorkspaceMembership } from "@/lib/data/workspace"
 import Layout from "@/components/kokonutui/layout"
@@ -32,6 +32,11 @@ export function WorkspaceLayoutClient({
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
   const [selectedWorkspace, setSelectedWorkspace] = useState(currentWorkspace)
+  
+  // 当 props 中的 currentWorkspace 变化时，更新本地状态
+  React.useEffect(() => {
+    setSelectedWorkspace(currentWorkspace)
+  }, [currentWorkspace])
   
   const switchWorkspace = (slug: string) => {
     const workspace = workspaces.find(w => w.workspace.slug === slug)
