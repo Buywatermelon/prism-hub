@@ -276,6 +276,7 @@ export function AddCredentialDialog({
                   onChange={(e) => setFormData(prev => ({ ...prev, api_key: e.target.value }))}
                   placeholder={editCredential ? '留空保持不变' : 'sk-...'}
                   required={!editCredential}
+                  autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
                   密钥将以明文形式存储（请确保数据库安全）

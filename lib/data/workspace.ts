@@ -1,8 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import type { Database } from "@/types/database.types"
+import type { WorkspacePreferences, WorkspaceMemberPreferences } from "@/types/preferences.types"
 
-export type Workspace = Database['public']['Tables']['workspaces']['Row']
-export type WorkspaceMember = Database['public']['Tables']['workspace_members']['Row']
+export type Workspace = Omit<Database['public']['Tables']['workspaces']['Row'], 'preferences'> & {
+  preferences: WorkspacePreferences
+}
+
+export type WorkspaceMember = Omit<Database['public']['Tables']['workspace_members']['Row'], 'preferences'> & {
+  preferences: WorkspaceMemberPreferences
+}
 
 export interface WorkspaceMembership {
   workspace: Workspace

@@ -13,11 +13,15 @@ import { useToast } from '@/components/ui/use-toast'
 import { updateWorkspace as updateWorkspaceAction } from './actions'
 import { useAbility } from '@/hooks'
 import type { WorkspaceMembership } from '@/lib/data/workspace'
+import { ModelPreferencesSettings } from '@/components/model-preferences/model-preferences-settings'
+import { getAvailableModels } from '@/app/actions/preferences'
+import type { ModelInfo } from '@/lib/utils/model-identifier'
 
 interface WorkspaceSettings {
   name: string
   description: string
   requireApproval: boolean
+  modelPriority: string[]
 }
 
 interface SettingsClientProps {
@@ -29,12 +33,14 @@ export default function SettingsClient({ workspace }: SettingsClientProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [models, setModels] = useState<ModelInfo[]>([])
   
   // 初始化设置，直接从 props 获取
   const [settings, setSettings] = useState<WorkspaceSettings>({
     name: workspace.workspace.name,
     description: workspace.workspace.description || '',
     requireApproval: (workspace.workspace.settings as any)?.require_approval || false,
+    modelPriority: workspace.workspace.preferences.model_priority || [],
   })
   const [initialSettings, setInitialSettings] = useState<WorkspaceSettings>(settings)
 
@@ -42,6 +48,17 @@ export default function SettingsClient({ workspace }: SettingsClientProps) {
     const hasChanges = JSON.stringify(settings) !== JSON.stringify(initialSettings)
     setHasUnsavedChanges(hasChanges)
   }, [settings, initialSettings])
+
+  useEffect(() => {
+    // 加载可用模型列表
+    const loadModels = async () => {
+      const result = await getAvailableModels(workspace.workspace.id)
+      if (result.success) {
+        setModels(result.data)
+      }
+    }
+    loadModels()
+  }, [workspace.workspace.id])
 
   const handleSettingChange = (key: keyof WorkspaceSettings, value: any) => {
     setSettings((prev) => ({ ...prev, [key]: value }))
@@ -53,6 +70,7 @@ export default function SettingsClient({ workspace }: SettingsClientProps) {
       name: settings.name,
       description: settings.description,
       settings: { require_approval: settings.requireApproval },
+      preferences: { model_priority: settings.modelPriority },
     })
 
     if (result.success) {
@@ -63,7 +81,7 @@ export default function SettingsClient({ workspace }: SettingsClientProps) {
       console.error('Failed to save settings:', result.error)
       toast({ 
         title: '保存设置失败', 
-        description: result.error.message, 
+        description: result.error?.message, 
         variant: 'destructive' 
       })
     }
@@ -143,6 +161,13 @@ export default function SettingsClient({ workspace }: SettingsClientProps) {
             </div>
           </CardContent>
         </Card>
+
+        <ModelPreferencesSettings
+          models={models}
+          currentOrder={settings.modelPriority}
+          context="workspace"
+          onOrderChange={(newOrder) => handleSettingChange('modelPriority', newOrder)}
+        />
       </div>
 
       {ability?.can('update', 'Settings') && (

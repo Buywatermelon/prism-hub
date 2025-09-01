@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS workspaces (
   description text,
   join_code text UNIQUE NOT NULL,
   settings jsonb DEFAULT '{}' NOT NULL,
+  preferences jsonb DEFAULT '{}' NOT NULL,
   created_by uuid REFERENCES auth.users(id),
   created_at timestamptz DEFAULT now() NOT NULL,
   updated_at timestamptz DEFAULT now() NOT NULL
@@ -22,6 +23,7 @@ COMMENT ON COLUMN workspaces.slug IS 'URL 友好的唯一标识符';
 COMMENT ON COLUMN workspaces.description IS '工作空间描述';
 COMMENT ON COLUMN workspaces.join_code IS '工作空间加入码，用于邀请新成员';
 COMMENT ON COLUMN workspaces.settings IS '工作空间设置，JSON 格式存储';
+COMMENT ON COLUMN workspaces.preferences IS '工作空间偏好设置，包含默认供应商优先级等配置，格式：{"provider_priority": ["provider_id_1", "provider_id_2"], "last_updated": "2025-01-01T00:00:00Z"}';
 COMMENT ON COLUMN workspaces.created_by IS '创建者用户 ID';
 
 -- 创建工作空间成员表
@@ -48,7 +50,7 @@ COMMENT ON COLUMN workspace_members.user_id IS '用户 ID';
 COMMENT ON COLUMN workspace_members.role IS '成员角色：owner-所有者，admin-管理员，member-普通成员';
 COMMENT ON COLUMN workspace_members.status IS '成员状态：pending-待审批，active-已激活，rejected-已拒绝';
 COMMENT ON COLUMN workspace_members.permissions IS '自定义权限覆盖，JSON 格式';
-COMMENT ON COLUMN workspace_members.preferences IS '用户在该工作空间的偏好设置，包括路由策略、模型偏好等';
+COMMENT ON COLUMN workspace_members.preferences IS '用户在该工作空间的偏好设置，格式：{"provider_priority": ["provider_id_1", "provider_id_2"], "last_updated": "2025-01-01T00:00:00Z"}';
 COMMENT ON COLUMN workspace_members.joined_at IS '加入工作空间的时间';
 COMMENT ON COLUMN workspace_members.invited_by IS '邀请人用户 ID';
 COMMENT ON COLUMN workspace_members.applied_at IS '申请加入时间';

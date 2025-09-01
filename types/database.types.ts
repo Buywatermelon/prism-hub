@@ -425,6 +425,7 @@ export type Database = {
           id: string
           join_code: string
           name: string
+          preferences: Json
           settings: Json
           slug: string
           updated_at: string
@@ -436,6 +437,7 @@ export type Database = {
           id?: string
           join_code: string
           name: string
+          preferences?: Json
           settings?: Json
           slug: string
           updated_at?: string
@@ -447,6 +449,7 @@ export type Database = {
           id?: string
           join_code?: string
           name?: string
+          preferences?: Json
           settings?: Json
           slug?: string
           updated_at?: string

@@ -271,7 +271,7 @@ export function AddProviderDialog({
                 id="models"
                 value={formData.models}
                 onChange={(e) => setFormData(prev => ({ ...prev, models: e.target.value }))}
-                placeholder="gpt-4&#10;gpt-3.5-turbo&#10;text-embedding-ada-002"
+                placeholder="gpt-4o"
                 rows={4}
               />
             </div>
