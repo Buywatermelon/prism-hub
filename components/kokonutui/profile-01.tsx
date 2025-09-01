@@ -36,13 +36,20 @@ export default function Profile01({
   // 处理登出
   function handleLogout() {
     startTransition(async () => {
-      try {
-        await signOut()
-        // Server Action 会处理重定向
-      } catch (error) {
-        console.error('Logout error:', error)
-        // 如果 Server Action 失败，尝试直接跳转
-        router.push('/login')
+      const result = await signOut()
+      
+      if (result && result.success) {
+        // 如果有重定向 URL，执行重定向
+        if (result.redirectTo) {
+          router.push(result.redirectTo)
+        }
+      } else if (result && !result.success) {
+        // 显示错误消息
+        toast({
+          title: "登出失败",
+          description: result.error.message,
+          variant: "destructive"
+        })
       }
     })
   }
