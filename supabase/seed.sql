@@ -72,3 +72,39 @@ CROSS JOIN permissions p
 WHERE r.name = 'member' 
   AND p.action = 'read'
 ON CONFLICT (role_id, permission_id) DO NOTHING;
+
+-- ==================== OAuth 令牌自动刷新设置 ====================
+
+-- 启用必要的扩展
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+
+-- 授予权限
+GRANT USAGE ON SCHEMA cron TO postgres;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA cron TO postgres;
+
+-- 创建 OAuth 令牌刷新定时任务（每30分钟执行一次）
+-- 注意：本地环境使用 host.docker.internal，生产环境需要替换为实际的项目 URL
+DO $$
+BEGIN
+  -- 检查是否已存在同名任务
+  IF NOT EXISTS (
+    SELECT 1 FROM cron.job WHERE jobname = 'refresh-oauth-tokens'
+  ) THEN
+    PERFORM cron.schedule(
+      'refresh-oauth-tokens',
+      '*/30 * * * *',
+      $CRON$
+      SELECT net.http_post(
+        url := 'http://host.docker.internal:54321/functions/v1/refresh-oauth',
+        headers := jsonb_build_object(
+          'Content-Type', 'application/json',
+          'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU'
+        ),
+        body := '{}'::jsonb
+      ) as request_id;
+      $CRON$
+    );
+    RAISE NOTICE 'OAuth 令牌刷新定时任务已创建';
+  END IF;
+END $$;

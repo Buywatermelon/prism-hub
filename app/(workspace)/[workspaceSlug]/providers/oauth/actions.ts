@@ -237,7 +237,7 @@ export async function exchangeOAuthCode(
     cookieStore.delete('oauth_context')
     cookieStore.delete('oauth_verifier')
     
-    revalidatePath('/[workspaceSlug]/providers')
+    revalidatePath('/[workspaceSlug]/providers', 'page')
     
     // 获取workspace的slug用于跳转
     const { data: workspace } = await supabase
@@ -357,7 +357,7 @@ export async function refreshOAuthToken(credentialId: string): Promise<Result<vo
       return Err(createError('DATABASE_ERROR', '更新凭证失败', updateError))
     }
     
-    revalidatePath('/[workspaceSlug]/providers')
+    revalidatePath('/[workspaceSlug]/providers', 'page')
     
     return Ok()
   } catch (error) {
@@ -386,6 +386,7 @@ export async function initBuiltinOAuthProviders(workspaceId: string): Promise<Re
       type: config.type,
       description: config.description,
       icon: config.icon,
+      endpoint: config.oauth.api_endpoint,
       config: {
         oauth: {
           ...config.oauth,
@@ -405,6 +406,7 @@ export async function initBuiltinOAuthProviders(workspaceId: string): Promise<Re
           type: provider.type,
           description: provider.description,
           icon: provider.icon,
+          endpoint: provider.endpoint,
           config: provider.config,
           created_by: user.id
         }, {

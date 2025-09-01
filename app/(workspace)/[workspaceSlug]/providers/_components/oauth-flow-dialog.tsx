@@ -188,7 +188,7 @@ export function OAuthFlowDialog({
           {/* 步骤指示器 */}
           <div className="flex items-center gap-2">
             {[1, 2, 3].map((s) => (
-              <div key={s} className="flex items-center">
+              <div key={s} className="flex items-center flex-1">
                 <div
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                     step >= s
@@ -206,7 +206,7 @@ export function OAuthFlowDialog({
                 </div>
                 {s < 3 && (
                   <div
-                    className={`w-full h-0.5 transition-colors ${
+                    className={`flex-1 h-0.5 transition-colors ml-2 ${
                       step > s ? 'bg-blue-600' : 'bg-muted'
                     }`}
                   />
@@ -293,15 +293,26 @@ export function OAuthFlowDialog({
                   onChange={(e) => {
                     const value = e.target.value
                     // 检查是否粘贴了完整的回调URL
-                    if (value.includes('?code=')) {
-                      const url = new URL(value)
-                      const code = url.searchParams.get('code')
-                      if (code) {
-                        setAuthCode(code)
-                        toast({
-                          title: '已提取授权码',
-                          description: '自动从URL中提取了授权码'
-                        })
+                    if (value.includes('?code=') || value.includes('&code=')) {
+                      try {
+                        const url = new URL(value)
+                        const code = url.searchParams.get('code')
+                        const state = url.searchParams.get('state')
+                        
+                        if (code) {
+                          setAuthCode(code)
+                          // 如果URL中包含state，更新authState
+                          if (state) {
+                            setAuthState(state)
+                          }
+                          toast({
+                            title: '已提取授权信息',
+                            description: '自动从URL中提取了授权码和状态'
+                          })
+                        }
+                      } catch (error) {
+                        // 如果不是有效的URL，可能是直接粘贴的授权码
+                        setAuthCode(value)
                       }
                     } else {
                       setAuthCode(value)
@@ -349,13 +360,6 @@ export function OAuthFlowDialog({
           )}
         </div>
         
-        {step !== 3 && (
-          <DialogFooter>
-            <Button variant="outline" onClick={handleClose}>
-              取消
-            </Button>
-          </DialogFooter>
-        )}
       </DialogContent>
     </Dialog>
   )
