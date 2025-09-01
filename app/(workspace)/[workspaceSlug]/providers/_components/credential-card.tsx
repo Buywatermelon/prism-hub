@@ -67,11 +67,11 @@ export function CredentialCard({ credential, onDeleted }: CredentialCardProps) {
     setIsDeleting(true)
     try {
       const result = await deleteCredential(credential.id)
-      if (result.error) {
-        console.error('Delete error:', result.error)
-      } else {
+      if (result.success) {
         onDeleted()
         setIsDeleteDialogOpen(false)
+      } else {
+        console.error('Delete error:', result.error.message)
       }
     } finally {
       setIsDeleting(false)

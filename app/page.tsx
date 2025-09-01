@@ -3,10 +3,11 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { getCurrentUser } from "@/lib/data/auth"
 import { getUserDefaultWorkspace } from "@/lib/data/workspace"
+import { unwrapOr } from "@/lib/result"
 
 export default async function Home() {
-  // 检查用户是否已登录
-  const user = await getCurrentUser()
+  // 检查用户是否已登录，失败时返回 null
+  const user = await unwrapOr(getCurrentUser(), null)
   
   if (user) {
     // 获取默认工作空间

@@ -2,7 +2,8 @@
 
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import type { Database } from '@/types/database.types'
-import { AuthenticationError, AuthorizationError, ValidationError, NotFoundError, BusinessError, DatabaseError } from '@/lib/errors'
+import { Result, Ok, Err, createError } from '@/lib/result'
+import type { AppError } from '@/lib/result'
 
 export type MemberStatus = 'active' | 'pending' | 'rejected'
 export type MemberRole = 'owner' | 'admin' | 'member'
@@ -49,33 +50,42 @@ async function buildActionContext(workspaceId: string | null) {
   }
 }
 
-function assertAuth(user: any) {
+function checkAuth(user: any): Result<void, AppError> {
   if (!user) {
-    throw new AuthenticationError()
+    return Err(createError('AUTH_REQUIRED', '请先登录'))
   }
+  return Ok()
 }
 
-function assertWorkspace(workspaceId: string | null) {
+function checkWorkspace(workspaceId: string | null): Result<string, AppError> {
   if (!workspaceId) {
-    throw new ValidationError('缺少工作空间 ID')
+    return Err(createError('VALIDATION_ERROR', '缺少工作空间 ID'))
   }
+  return Ok(workspaceId)
 }
 
-async function assertRole(ctx: Awaited<ReturnType<typeof buildActionContext>>, allowed: Role[]) {
+async function checkRole(ctx: Awaited<ReturnType<typeof buildActionContext>>, allowed: Role[]): Promise<Result<void, AppError>> {
   const r = await ctx.role()
   if (!r || !allowed.includes(r)) {
-    throw new AuthorizationError('需要 ' + allowed.join(' 或 ') + ' 权限')
+    return Err(createError('PERMISSION_DENIED', '需要 ' + allowed.join(' 或 ') + ' 权限'))
   }
+  return Ok()
 }
 
-export async function getMembers(workspaceId: string, status?: MemberStatus[]): Promise<WorkspaceMember[]> {
+export async function getMembers(workspaceId: string, status?: MemberStatus[]): Promise<Result<WorkspaceMember[], AppError>> {
   const ctx = await buildActionContext(workspaceId)
-  assertAuth(ctx.user)
-  assertWorkspace(ctx.workspaceId)
+  
+  const authResult = checkAuth(ctx.user)
+  if (!authResult.success) return authResult
+  
+  const workspaceResult = checkWorkspace(ctx.workspaceId)
+  if (!workspaceResult.success) return workspaceResult
 
   // 必须是工作空间成员
   const membership = await ctx.membership()
-  if (!membership) throw new AuthorizationError('需要工作空间成员权限')
+  if (!membership) {
+    return Err(createError('PERMISSION_DENIED', '需要工作空间成员权限'))
+  }
 
   const supabase = ctx.supabase
   const supabaseAdmin = await createServiceRoleClient()
@@ -89,7 +99,7 @@ export async function getMembers(workspaceId: string, status?: MemberStatus[]): 
   const { data: members, error: membersError } = await finalQuery.order('joined_at', { ascending: false })
   if (membersError) {
     console.error('Failed to fetch members:', membersError)
-    throw new DatabaseError('加载成员列表失败', membersError)
+    return Err(createError('DATABASE_ERROR', '加载成员列表失败'))
   }
 
   const userIds = [...new Set(members?.map((m) => m.user_id).filter(Boolean) || [])]
@@ -122,14 +132,20 @@ export async function getMembers(workspaceId: string, status?: MemberStatus[]): 
     return new Date(b.joined_at).getTime() - new Date(a.joined_at).getTime()
   })
 
-  return formatted
+  return Ok(formatted)
 }
 
-export async function approveMember(workspaceId: string, membershipId: string): Promise<WorkspaceMember> {
+export async function approveMember(workspaceId: string, membershipId: string): Promise<Result<WorkspaceMember, AppError>> {
   const ctx = await buildActionContext(workspaceId)
-  assertAuth(ctx.user)
-  assertWorkspace(ctx.workspaceId)
-  await assertRole(ctx, ['owner', 'admin'])
+  
+  const authResult = checkAuth(ctx.user)
+  if (!authResult.success) return authResult
+  
+  const workspaceResult = checkWorkspace(ctx.workspaceId)
+  if (!workspaceResult.success) return workspaceResult
+  
+  const roleResult = await checkRole(ctx, ['owner', 'admin'])
+  if (!roleResult.success) return roleResult
 
   const supabase = ctx.supabase
 
@@ -139,8 +155,12 @@ export async function approveMember(workspaceId: string, membershipId: string): 
     .eq('id', membershipId)
     .eq('workspace_id', workspaceId)
     .single()
-  if (memberError || !target) throw new NotFoundError('成员不存在')
-  if (target.status !== 'pending') throw new BusinessError(target.status === 'active' ? '该成员已经被批准' : '该成员申请已经被处理')
+  if (memberError || !target) {
+    return Err(createError('NOT_FOUND', '成员不存在'))
+  }
+  if (target.status !== 'pending') {
+    return Err(createError('BUSINESS_ERROR', target.status === 'active' ? '该成员已经被批准' : '该成员申请已经被处理'))
+  }
 
   const { data: updated, error: updateError } = await supabase
     .from('workspace_members')
@@ -148,19 +168,27 @@ export async function approveMember(workspaceId: string, membershipId: string): 
     .eq('id', membershipId)
     .select('*')
     .single()
-  if (updateError || !updated) throw new DatabaseError('批准失败，请稍后重试', updateError)
-  return updated as WorkspaceMember
+  if (updateError || !updated) {
+    return Err(createError('DATABASE_ERROR', '批准失败，请稍后重试'))
+  }
+  return Ok(updated as WorkspaceMember)
 }
 
 export async function rejectMember(
   workspaceId: string,
   membershipId: string,
   reason?: string
-): Promise<WorkspaceMember> {
+): Promise<Result<WorkspaceMember, AppError>> {
   const ctx = await buildActionContext(workspaceId)
-  assertAuth(ctx.user)
-  assertWorkspace(ctx.workspaceId)
-  await assertRole(ctx, ['owner', 'admin'])
+  
+  const authResult = checkAuth(ctx.user)
+  if (!authResult.success) return authResult
+  
+  const workspaceResult = checkWorkspace(ctx.workspaceId)
+  if (!workspaceResult.success) return workspaceResult
+  
+  const roleResult = await checkRole(ctx, ['owner', 'admin'])
+  if (!roleResult.success) return roleResult
 
   const supabase = ctx.supabase
   const { data: target, error: memberError } = await supabase
@@ -169,8 +197,12 @@ export async function rejectMember(
     .eq('id', membershipId)
     .eq('workspace_id', workspaceId)
     .single()
-  if (memberError || !target) throw new NotFoundError('成员不存在')
-  if (target.status !== 'pending') throw new BusinessError(target.status === 'active' ? '该成员已经被批准' : '该成员申请已经被处理')
+  if (memberError || !target) {
+    return Err(createError('NOT_FOUND', '成员不存在'))
+  }
+  if (target.status !== 'pending') {
+    return Err(createError('BUSINESS_ERROR', target.status === 'active' ? '该成员已经被批准' : '该成员申请已经被处理'))
+  }
 
   const { data: updated, error: updateError } = await supabase
     .from('workspace_members')
@@ -178,19 +210,27 @@ export async function rejectMember(
     .eq('id', membershipId)
     .select('*')
     .single()
-  if (updateError || !updated) throw new DatabaseError('拒绝失败，请稍后重试', updateError)
-  return updated as WorkspaceMember
+  if (updateError || !updated) {
+    return Err(createError('DATABASE_ERROR', '拒绝失败，请稍后重试'))
+  }
+  return Ok(updated as WorkspaceMember)
 }
 
 export async function updateMemberRole(
   workspaceId: string,
   membershipId: string,
   role: Exclude<MemberRole, 'owner'>
-): Promise<WorkspaceMember> {
+): Promise<Result<WorkspaceMember, AppError>> {
   const ctx = await buildActionContext(workspaceId)
-  assertAuth(ctx.user)
-  assertWorkspace(ctx.workspaceId)
-  await assertRole(ctx, ['owner', 'admin'])
+  
+  const authResult = checkAuth(ctx.user)
+  if (!authResult.success) return authResult
+  
+  const workspaceResult = checkWorkspace(ctx.workspaceId)
+  if (!workspaceResult.success) return workspaceResult
+  
+  const roleResult = await checkRole(ctx, ['owner', 'admin'])
+  if (!roleResult.success) return roleResult
 
   const supabase = ctx.supabase
   const { data: target, error: memberError } = await supabase
@@ -199,8 +239,12 @@ export async function updateMemberRole(
     .eq('id', membershipId)
     .eq('workspace_id', workspaceId)
     .single()
-  if (memberError || !target) throw new NotFoundError('成员不存在')
-  if (target.role === 'owner') throw new BusinessError('不能修改所有者角色')
+  if (memberError || !target) {
+    return Err(createError('NOT_FOUND', '成员不存在'))
+  }
+  if (target.role === 'owner') {
+    return Err(createError('BUSINESS_ERROR', '不能修改所有者角色'))
+  }
 
   const { data: updated, error: updateError } = await supabase
     .from('workspace_members')
@@ -208,17 +252,23 @@ export async function updateMemberRole(
     .eq('id', membershipId)
     .select('*')
     .single()
-  if (updateError || !updated) throw new DatabaseError('更新角色失败，请稍后重试', updateError)
-  return updated as WorkspaceMember
+  if (updateError || !updated) {
+    return Err(createError('DATABASE_ERROR', '更新角色失败，请稍后重试'))
+  }
+  return Ok(updated as WorkspaceMember)
 }
 
 export async function removeMember(
   workspaceId: string,
   membershipId: string
-): Promise<{ success: boolean; message?: string }> {
+): Promise<Result<{ message: string }, AppError>> {
   const ctx = await buildActionContext(workspaceId)
-  assertAuth(ctx.user)
-  assertWorkspace(ctx.workspaceId)
+  
+  const authResult = checkAuth(ctx.user)
+  if (!authResult.success) return authResult
+  
+  const workspaceResult = checkWorkspace(ctx.workspaceId)
+  if (!workspaceResult.success) return workspaceResult
 
   const supabase = ctx.supabase
   const { data: currentMembership } = await supabase
@@ -228,7 +278,9 @@ export async function removeMember(
     .eq('user_id', ctx.user!.id)
     .eq('status', 'active')
     .single()
-  if (!currentMembership) throw new AuthorizationError()
+  if (!currentMembership) {
+    return Err(createError('PERMISSION_DENIED', '需要工作空间成员权限'))
+  }
 
   const { data: target, error: memberError } = await supabase
     .from('workspace_members')
@@ -236,20 +288,26 @@ export async function removeMember(
     .eq('id', membershipId)
     .eq('workspace_id', workspaceId)
     .single()
-  if (memberError || !target) throw new NotFoundError('成员不存在')
-  if (target.role === 'owner') throw new BusinessError('不能移除工作空间所有者')
+  if (memberError || !target) {
+    return Err(createError('NOT_FOUND', '成员不存在'))
+  }
+  if (target.role === 'owner') {
+    return Err(createError('BUSINESS_ERROR', '不能移除工作空间所有者'))
+  }
 
   const isSelf = target.user_id === ctx.user!.id
   if (!isSelf && !['owner', 'admin'].includes(currentMembership.role as Role)) {
-    throw new AuthorizationError('需要管理员权限')
+    return Err(createError('PERMISSION_DENIED', '需要管理员权限'))
   }
 
   const { error: deleteError } = await supabase
     .from('workspace_members')
     .delete()
     .eq('id', membershipId)
-  if (deleteError) throw new DatabaseError('移除成员失败，请稍后重试', deleteError)
+  if (deleteError) {
+    return Err(createError('DATABASE_ERROR', '移除成员失败，请稍后重试'))
+  }
 
-  return { success: true, message: isSelf ? '已退出工作空间' : '成员已移除' }
+  return Ok({ message: isSelf ? '已退出工作空间' : '成员已移除' })
 }
 

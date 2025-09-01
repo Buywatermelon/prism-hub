@@ -1,14 +1,15 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { Provider, ProviderInsert, ProviderUpdate, CredentialInsert, CredentialUpdate } from './types'
+import { Provider, ProviderInsert, ProviderUpdate, CredentialInsert, CredentialUpdate, Credential } from './types'
+import { Result, Ok, Err, createError, AppError } from '@/lib/result'
 
 // ==================== Provider Actions ====================
 
 /**
  * 获取工作空间的所有供应商
  */
-export async function getProviders(workspaceId: string) {
+export async function getProviders(workspaceId: string): Promise<Result<Provider[], AppError>> {
   const supabase = await createClient()
   
   const { data, error } = await supabase
@@ -19,22 +20,22 @@ export async function getProviders(workspaceId: string) {
 
   if (error) {
     console.error('Error fetching providers:', error)
-    return []
+    return Err(createError('DATABASE_ERROR', '获取供应商列表失败', error))
   }
 
-  return data as Provider[]
+  return Ok(data as Provider[])
 }
 
 /**
  * 创建新的供应商
  */
-export async function createProvider(workspaceId: string, provider: Omit<ProviderInsert, 'workspace_id' | 'id' | 'created_at' | 'updated_at'>) {
+export async function createProvider(workspaceId: string, provider: Omit<ProviderInsert, 'workspace_id' | 'id' | 'created_at' | 'updated_at'>): Promise<Result<Provider, AppError>> {
   const supabase = await createClient()
   
   // 获取当前用户
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) {
-    return { error: 'Unauthorized' }
+    return Err(createError('AUTH_REQUIRED', '用户未登录'))
   }
 
   // 推断供应商类型
@@ -57,19 +58,19 @@ export async function createProvider(workspaceId: string, provider: Omit<Provide
     console.error('Error creating provider:', error)
     // 处理重复名称错误
     if (error.code === '23505') {
-      return { error: `已存在名为 "${provider.name}" 的供应商，请使用其他名称` }
+      return Err(createError('DUPLICATE_ENTRY', `已存在名为 "${provider.name}" 的供应商，请使用其他名称`))
     }
-    return { error: error.message }
+    return Err(createError('DATABASE_ERROR', '创建供应商失败', error))
   }
 
   // 不调用 revalidatePath，依赖客户端的乐观更新
-  return { data }
+  return Ok(data as Provider)
 }
 
 /**
  * 更新供应商
  */
-export async function updateProvider(providerId: string, updates: ProviderUpdate) {
+export async function updateProvider(providerId: string, updates: ProviderUpdate): Promise<Result<Provider, AppError>> {
   const supabase = await createClient()
   
   // 如果更新了 endpoint，重新推断类型
@@ -90,17 +91,17 @@ export async function updateProvider(providerId: string, updates: ProviderUpdate
 
   if (error) {
     console.error('Error updating provider:', error)
-    return { error: error.message }
+    return Err(createError('DATABASE_ERROR', '更新供应商失败', error))
   }
 
   // 不调用 revalidatePath，依赖客户端的乐观更新
-  return { data }
+  return Ok(data as Provider)
 }
 
 /**
  * 删除供应商（会级联删除所有相关凭证）
  */
-export async function deleteProvider(providerId: string) {
+export async function deleteProvider(providerId: string): Promise<Result<void, AppError>> {
   const supabase = await createClient()
   
   // 直接删除供应商（数据库设置了 ON DELETE CASCADE，会自动删除关联的凭证）
@@ -111,11 +112,11 @@ export async function deleteProvider(providerId: string) {
 
   if (error) {
     console.error('Error deleting provider:', error)
-    return { error: error.message }
+    return Err(createError('DATABASE_ERROR', '删除供应商失败', error))
   }
 
   // 不调用 revalidatePath，依赖客户端的乐观更新
-  return { success: true }
+  return Ok()
 }
 
 // ==================== Credential Actions ====================
@@ -123,7 +124,7 @@ export async function deleteProvider(providerId: string) {
 /**
  * 获取工作空间的所有凭证
  */
-export async function getCredentials(workspaceId: string) {
+export async function getCredentials(workspaceId: string): Promise<Result<Credential[], AppError>> {
   const supabase = await createClient()
   
   const { data, error } = await supabase
@@ -134,22 +135,24 @@ export async function getCredentials(workspaceId: string) {
 
   if (error) {
     console.error('Error fetching credentials:', error)
-    return []
+    return Err(createError('DATABASE_ERROR', '获取凭证列表失败', error))
   }
 
   // 返回凭证数据，包括完整的API密钥
-  return data.map(credential => ({
+  const credentials = data.map(credential => ({
     ...credential,
     api_key: credential.encrypted_key, // 将encrypted_key作为明文api_key返回
     encrypted_key: undefined, // 移除原字段
     key_hint: credential.key_hint || maskApiKey(credential.encrypted_key)
-  }))
+  })) as Credential[]
+  
+  return Ok(credentials)
 }
 
 /**
  * 获取供应商的凭证
  */
-export async function getCredentialsByProvider(providerId: string) {
+export async function getCredentialsByProvider(providerId: string): Promise<Result<Credential[], AppError>> {
   const supabase = await createClient()
   
   const { data, error } = await supabase
@@ -160,16 +163,18 @@ export async function getCredentialsByProvider(providerId: string) {
 
   if (error) {
     console.error('Error fetching credentials:', error)
-    return []
+    return Err(createError('DATABASE_ERROR', '获取供应商凭证失败', error))
   }
 
   // 返回凭证数据，包括完整的API密钥
-  return data.map(credential => ({
+  const credentials = data.map(credential => ({
     ...credential,
     api_key: credential.encrypted_key, // 将encrypted_key作为明文api_key返回
     encrypted_key: undefined, // 移除原字段
     key_hint: credential.key_hint || maskApiKey(credential.encrypted_key)
-  }))
+  })) as Credential[]
+  
+  return Ok(credentials)
 }
 
 /**
@@ -179,13 +184,13 @@ export async function createCredential(
   workspaceId: string, 
   providerId: string,
   credential: Omit<CredentialInsert, 'workspace_id' | 'provider_id' | 'id' | 'created_at' | 'updated_at'>
-) {
+): Promise<Result<Credential, AppError>> {
   const supabase = await createClient()
   
   // 获取当前用户
   const { data: { user }, error: userError } = await supabase.auth.getUser()
   if (userError || !user) {
-    return { error: 'Unauthorized' }
+    return Err(createError('AUTH_REQUIRED', '用户未登录'))
   }
 
   // 处理API密钥 - 生成提示信息（不加密，直接存储）
@@ -211,7 +216,7 @@ export async function createCredential(
 
   if (error) {
     console.error('Error creating credential:', error)
-    return { error: error.message }
+    return Err(createError('DATABASE_ERROR', '创建凭证失败', error))
   }
 
   // 返回完整数据，包括API密钥
@@ -220,16 +225,16 @@ export async function createCredential(
     api_key: data.encrypted_key, // 将encrypted_key作为api_key返回
     encrypted_key: undefined,
     key_hint: data.key_hint || keyHint
-  }
+  } as Credential
 
   // 不调用 revalidatePath，依赖客户端的乐观更新
-  return { data: result }
+  return Ok(result)
 }
 
 /**
  * 更新凭证
  */
-export async function updateCredential(credentialId: string, updates: CredentialUpdate) {
+export async function updateCredential(credentialId: string, updates: CredentialUpdate): Promise<Result<Credential, AppError>> {
   const supabase = await createClient()
   
   // 如果更新了密钥，重新生成提示信息
@@ -251,7 +256,7 @@ export async function updateCredential(credentialId: string, updates: Credential
 
   if (error) {
     console.error('Error updating credential:', error)
-    return { error: error.message }
+    return Err(createError('DATABASE_ERROR', '更新凭证失败', error))
   }
 
   // 返回完整数据，包括API密钥
@@ -260,16 +265,16 @@ export async function updateCredential(credentialId: string, updates: Credential
     api_key: data.encrypted_key, // 将encrypted_key作为api_key返回
     encrypted_key: undefined,
     key_hint: data.key_hint
-  }
+  } as Credential
 
   // 不调用 revalidatePath，依赖客户端的乐观更新
-  return { data: result }
+  return Ok(result)
 }
 
 /**
  * 删除凭证
  */
-export async function deleteCredential(credentialId: string) {
+export async function deleteCredential(credentialId: string): Promise<Result<void, AppError>> {
   const supabase = await createClient()
   
   const { error } = await supabase
@@ -279,11 +284,11 @@ export async function deleteCredential(credentialId: string) {
 
   if (error) {
     console.error('Error deleting credential:', error)
-    return { error: error.message }
+    return Err(createError('DATABASE_ERROR', '删除凭证失败', error))
   }
 
   // 不调用 revalidatePath，依赖客户端的乐观更新
-  return { success: true }
+  return Ok()
 }
 
 // ==================== Helper Functions ====================

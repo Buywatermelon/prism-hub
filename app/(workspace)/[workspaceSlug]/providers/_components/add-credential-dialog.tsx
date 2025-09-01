@@ -123,13 +123,7 @@ export function AddCredentialDialog({
 
         const result = await updateCredential(editCredential.id, updates)
 
-        if (result.error) {
-          toast({
-            title: '更新失败',
-            description: result.error,
-            variant: 'destructive',
-          })
-        } else if (result.data) {
+        if (result.success) {
           toast({
             title: '更新成功',
             description: `凭证 ${result.data.name} 已更新`,
@@ -137,6 +131,12 @@ export function AddCredentialDialog({
           // 直接使用返回的数据，actions已经处理好了api_key字段
           onCredentialUpdated?.(result.data as Credential)
           setOpen(false)
+        } else {
+          toast({
+            title: '更新失败',
+            description: result.error.message,
+            variant: 'destructive',
+          })
         }
       } else {
         // 创建模式
@@ -155,13 +155,7 @@ export function AddCredentialDialog({
           }
         )
 
-        if (result.error) {
-          toast({
-            title: '创建失败',
-            description: result.error,
-            variant: 'destructive',
-          })
-        } else if (result.data) {
+        if (result.success) {
           toast({
             title: '创建成功',
             description: `凭证 ${result.data.name} 已添加`,
@@ -175,6 +169,12 @@ export function AddCredentialDialog({
             name: defaultName,
             credential_type: 'api_key',
             api_key: ''
+          })
+        } else {
+          toast({
+            title: '创建失败',
+            description: result.error.message,
+            variant: 'destructive',
           })
         }
       }

@@ -140,109 +140,143 @@ prism-hub/
 ## 🔥 异常处理规范 (Result 模式)
 
 ### 核心理念
-使用 **Result 模式** 代替异常抛出，将错误处理作为正常的控制流，提供类型安全和更好的错误处理体验。
+使用 **Result 模式** 代替异常抛出，提供类型安全的错误处理。保持简单，避免过度设计。
 
-### Server Actions
-- **必须**返回 `Result<T, AppError>` 类型
-- **使用工具函数**：`Ok()`, `Err()`, `OkWithRedirect()`
-- **标准错误代码**：使用预定义的 `ErrorCode` 枚举
+### 1. Server Actions
+始终返回 `Result<T, AppError>`，不抛出异常：
 
 ```typescript
-// ✅ 正确 - Result 模式
 import { Result, Ok, Err, createError } from '@/lib/result'
 
-export async function updateProfile(
-  data: FormData
-): Promise<Result<User, AppError>> {
-  if (!isValid) {
-    return Err(createError('VALIDATION_ERROR', '数据无效'))
+// 简单操作 - 不需要 try-catch
+export async function getUser(id: string): Promise<Result<User, AppError>> {
+  if (!id) {
+    return Err(createError('VALIDATION_ERROR', 'ID 不能为空'))
   }
-  return Ok(updatedUser)
+  
+  const user = await db.users.findById(id)  // 如果崩溃，让它崩溃
+  if (!user) {
+    return Err(createError('NOT_FOUND', '用户不存在'))
+  }
+  
+  return Ok(user)
 }
 
-// 带重定向的 Action
-export async function signIn(
-  data: FormData
-): Promise<ResultWithRedirect<void, AppError>> {
-  if (success) {
-    return Redirect('/dashboard')  // 更简洁！
+// 复杂操作 - 使用 try-catch 捕获未预期错误
+export async function createWorkspace(data: FormData): Promise<Result<Workspace, AppError>> {
+  try {
+    // 验证
+    if (!data.get('name')) {
+      return Err(createError('VALIDATION_ERROR', '名称不能为空'))
+    }
+    
+    // 多步骤操作
+    const workspace = await db.workspaces.create(data)
+    await initializeProviders(workspace.id)
+    await sendNotification(workspace.owner_id)
+    
+    return Ok(workspace)
+  } catch (error) {
+    // 只在最外层捕获未预期错误
+    console.error('[CreateWorkspace] Error:', error)
+    return Err(createError('INTERNAL_ERROR', '创建失败，请重试'))
   }
-  return Err(createError('AUTH_FAILED', '登录失败'))
 }
-```
 
-### 客户端组件
-- **无需 try-catch**：直接处理返回的 Result
-- **类型安全**：TypeScript 自动推断成功/失败类型
-- **差异化处理**：根据错误代码执行不同逻辑
-
-```typescript
-// ✅ 正确 - 处理 Result
-const result = await serverAction(formData)
-
-if (result.success) {
-  toast({ description: '操作成功' })
-  if (result.redirectTo) {
-    router.push(result.redirectTo)
-  }
-} else {
-  // 根据错误代码差异化处理
-  switch (result.error.code) {
-    case 'AUTH_FAILED':
-      router.push('/login')
-      break
-    case 'VALIDATION_ERROR':
-      form.setError('root', { message: result.error.message })
-      break
-    default:
-      toast({ 
-        description: result.error.message,
-        variant: 'destructive'
-      })
-  }
+// 带重定向
+export async function signIn(data: FormData): Promise<ResultWithRedirect<void, AppError>> {
+  const result = await authenticate(data)
+  if (!result.success) return result
+  
+  return Redirect('/dashboard')  // 成功后重定向
 }
 ```
 
-### 标准错误代码
+### 2. Server Components
+使用 `unwrap()` 自动解包 Result：
+
 ```typescript
-// 认证相关
-'AUTH_FAILED'         // 认证失败
-'AUTH_REQUIRED'       // 需要登录
-'EMAIL_NOT_VERIFIED'  // 邮箱未验证
+import { unwrap } from '@/lib/result'
 
-// 验证相关
-'VALIDATION_ERROR'    // 输入验证失败
-'DUPLICATE_ENTRY'     // 重复数据
-
-// 业务逻辑
-'NOT_FOUND'          // 资源不存在
-'PERMISSION_DENIED'  // 权限不足
-'BUSINESS_ERROR'     // 业务错误
-
-// 系统相关
-'DATABASE_ERROR'     // 数据库错误
-'INTERNAL_ERROR'     // 内部错误
+export default async function UserPage({ params }: Props) {
+  // unwrap 失败时自动抛出错误，被 error.tsx 捕获
+  const user = await unwrap(getUser(params.id))
+  
+  return <UserProfile user={user} />
+}
 ```
 
-### 工具函数
+### 3. Client Components
+直接处理 Result 对象：
+
 ```typescript
-// 基础工具
-Ok()                        // 创建无数据的成功结果
-Ok(data)                    // 创建带数据的成功结果
-Err(error)                  // 创建失败结果
-Redirect(url)               // 创建仅重定向的成功结果
+'use client'
 
-// 错误创建
-createError(code, message, details?)  // 创建标准错误
-
-// 类型守卫
-isOk(result)   // 判断是否成功
-isErr(result)  // 判断是否失败
-
-// 链式操作
-mapResult(result, fn)  // 转换成功值
-mapError(result, fn)   // 转换错误值
+export function CreateButton() {
+  const handleCreate = async (data: FormData) => {
+    const result = await createWorkspace(data)
+    
+    if (result.success) {
+      toast.success('创建成功')
+      if (result.redirectTo) {
+        router.push(result.redirectTo)
+      }
+    } else {
+      // 根据错误代码处理
+      if (result.error.code === 'AUTH_REQUIRED') {
+        router.push('/login')
+      } else {
+        toast.error(result.error.message)
+      }
+    }
+  }
+  
+  return <button onClick={handleCreate}>创建</button>
+}
 ```
+
+### 4. 标准错误代码
+```typescript
+type ErrorCode = 
+  // 认证
+  | 'AUTH_FAILED'        // 认证失败
+  | 'AUTH_REQUIRED'      // 需要登录
+  // 验证
+  | 'VALIDATION_ERROR'   // 输入无效
+  | 'DUPLICATE_ENTRY'    // 重复数据
+  // 业务
+  | 'NOT_FOUND'         // 资源不存在
+  | 'PERMISSION_DENIED' // 权限不足
+  | 'BUSINESS_ERROR'    // 业务错误
+  // 系统
+  | 'DATABASE_ERROR'    // 数据库错误
+  | 'NETWORK_ERROR'     // 网络错误
+  | 'INTERNAL_ERROR'    // 内部错误
+```
+
+### 5. 核心 API
+```typescript
+// 创建结果
+Ok(data?)              // 成功结果
+Err(error)             // 失败结果
+Redirect(url)          // 重定向结果
+
+// 创建错误
+createError(code, message, details?)
+
+// Server Component 专用
+unwrap(result)         // 解包或抛出错误
+
+// 类型守卫（可选）
+isOk(result)           // 是否成功
+isErr(result)          // 是否失败
+```
+
+### 设计原则
+- **保持简单**：不使用装饰器或复杂的中间件
+- **显式优于隐式**：错误处理逻辑应该可见
+- **渐进式改进**：新旧代码可以共存
+- **类型安全**：充分利用 TypeScript 类型推断
 
 ## 供应商管理
 ### 内置 OAuth 供应商

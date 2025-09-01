@@ -3,6 +3,7 @@ import { ProviderList } from './_components/provider-list'
 import { getProviders, getCredentials } from './actions'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
+import { unwrap } from '@/lib/result'
 
 export default async function ProvidersPage({
   params
@@ -23,9 +24,10 @@ export default async function ProvidersPage({
     notFound()
   }
   
+  // 使用 unwrap 自动解包，失败时抛出带 code 的错误
   const [providers, credentials] = await Promise.all([
-    getProviders(workspace.id),
-    getCredentials(workspace.id)
+    unwrap(getProviders(workspace.id)),
+    unwrap(getCredentials(workspace.id))
   ])
 
   return (

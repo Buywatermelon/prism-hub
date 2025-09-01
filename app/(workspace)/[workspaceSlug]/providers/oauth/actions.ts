@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { generateState, buildQueryString, calculateExpiresAt, formatScopes, generatePKCE } from '@/lib/oauth/utils'
 import { BUILTIN_OAUTH_PROVIDERS } from '@/lib/oauth/config'
 import { cookies } from 'next/headers'
+import { Result, Ok, Err, createError, AppError } from '@/lib/result'
 
 /**
  * 生成OAuth授权URL
@@ -13,7 +14,7 @@ import { cookies } from 'next/headers'
 export async function generateOAuthURL(
   providerId: string,
   workspaceId: string
-) {
+): Promise<Result<{ url: string; state: string }, AppError>> {
   try {
     const supabase = await createClient()
     
@@ -25,13 +26,13 @@ export async function generateOAuthURL(
       .single()
     
     if (error || !provider) {
-      return { error: '供应商不存在' }
+      return Err(createError('NOT_FOUND', '供应商不存在'))
     }
     
     // 获取对应的OAuth配置
     const oauthConfig = BUILTIN_OAUTH_PROVIDERS.find(p => p.type === provider.type)
     if (!oauthConfig) {
-      return { error: '该供应商不支持OAuth' }
+      return Err(createError('BUSINESS_ERROR', '该供应商不支持OAuth'))
     }
     
     // 生成state
@@ -92,13 +93,13 @@ export async function generateOAuthURL(
     
     const authUrl = `${oauthConfig.oauth.authorization_url}?${buildQueryString(params)}`
     
-    return { 
+    return Ok({ 
       url: authUrl,
       state 
-    }
+    })
   } catch (error) {
     console.error('Error generating OAuth URL:', error)
-    return { error: '生成授权链接失败' }
+    return Err(createError('INTERNAL_ERROR', '生成授权链接失败', error))
   }
 }
 
@@ -109,7 +110,7 @@ export async function generateOAuthURL(
 export async function exchangeOAuthCode(
   code: string,
   state?: string
-) {
+): Promise<Result<{ credential: any; workspace_slug?: string }, AppError>> {
   try {
     const cookieStore = await cookies()
     
@@ -117,14 +118,14 @@ export async function exchangeOAuthCode(
     if (state) {
       const storedState = cookieStore.get('oauth_state')?.value
       if (!storedState || storedState !== state) {
-        return { error: '授权状态验证失败' }
+        return Err(createError('AUTH_FAILED', '授权状态验证失败'))
       }
     }
     
     // 获取context信息
     const contextStr = cookieStore.get('oauth_context')?.value
     if (!contextStr) {
-      return { error: '授权上下文丢失，请重新授权' }
+      return Err(createError('AUTH_FAILED', '授权上下文丢失，请重新授权'))
     }
     
     const context = JSON.parse(contextStr)
@@ -133,7 +134,7 @@ export async function exchangeOAuthCode(
     // 获取OAuth配置
     const oauthConfig = BUILTIN_OAUTH_PROVIDERS.find(p => p.type === provider_type)
     if (!oauthConfig) {
-      return { error: '未找到OAuth配置' }
+      return Err(createError('NOT_FOUND', '未找到OAuth配置'))
     }
     
     const supabase = await createClient()
@@ -141,7 +142,7 @@ export async function exchangeOAuthCode(
     // 获取当前用户
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { error: '未登录' }
+      return Err(createError('AUTH_REQUIRED', '未登录'))
     }
     
     // 准备token交换参数
@@ -193,7 +194,7 @@ export async function exchangeOAuthCode(
     if (!tokenResponse.ok) {
       const error = await tokenResponse.text()
       console.error('Token exchange failed:', error)
-      return { error: '令牌交换失败' }
+      return Err(createError('AUTH_FAILED', '令牌交换失败', error))
     }
     
     const tokens = await tokenResponse.json()
@@ -228,7 +229,7 @@ export async function exchangeOAuthCode(
     
     if (credError) {
       console.error('Error creating credential:', credError)
-      return { error: '保存凭证失败' }
+      return Err(createError('DATABASE_ERROR', '保存凭证失败', credError))
     }
     
     // 清理cookie
@@ -245,16 +246,16 @@ export async function exchangeOAuthCode(
       .eq('id', workspace_id)
       .single()
     
-    return { 
+    return Ok({ 
       credential: {
         ...credential,
         api_key: tokens.access_token, // 兼容现有的凭证显示逻辑
       },
       workspace_slug: workspace?.slug
-    }
+    })
   } catch (error) {
     console.error('Error exchanging OAuth code:', error)
-    return { error: '授权失败，请重试' }
+    return Err(createError('INTERNAL_ERROR', '授权失败，请重试', error))
   }
 }
 
@@ -262,7 +263,7 @@ export async function exchangeOAuthCode(
  * 刷新OAuth访问令牌
  * 根据oauth-integration-guide-zh.md实现
  */
-export async function refreshOAuthToken(credentialId: string) {
+export async function refreshOAuthToken(credentialId: string): Promise<Result<void, AppError>> {
   try {
     const supabase = await createClient()
     
@@ -274,23 +275,23 @@ export async function refreshOAuthToken(credentialId: string) {
       .single()
     
     if (credError || !credential) {
-      return { error: '凭证不存在' }
+      return Err(createError('NOT_FOUND', '凭证不存在'))
     }
     
     if (credential.credential_type !== 'oauth_account') {
-      return { error: '该凭证不是OAuth类型' }
+      return Err(createError('VALIDATION_ERROR', '该凭证不是OAuth类型'))
     }
     
     const oauthData = credential.oauth_data as Record<string, any>
     const refreshToken = oauthData?.refresh_token as string | undefined
     if (!refreshToken) {
-      return { error: '没有刷新令牌' }
+      return Err(createError('BUSINESS_ERROR', '没有刷新令牌'))
     }
     
     const providerType = credential.providers?.type
     const oauthConfig = BUILTIN_OAUTH_PROVIDERS.find(p => p.type === providerType)
     if (!oauthConfig) {
-      return { error: 'OAuth配置缺失' }
+      return Err(createError('NOT_FOUND', 'OAuth配置缺失'))
     }
     
     // 准备刷新令牌参数
@@ -333,7 +334,7 @@ export async function refreshOAuthToken(credentialId: string) {
     }
     
     if (!tokenResponse.ok) {
-      return { error: '令牌刷新失败' }
+      return Err(createError('AUTH_FAILED', '令牌刷新失败'))
     }
     
     const tokens = await tokenResponse.json()
@@ -353,15 +354,15 @@ export async function refreshOAuthToken(credentialId: string) {
       .eq('id', credentialId)
     
     if (updateError) {
-      return { error: '更新凭证失败' }
+      return Err(createError('DATABASE_ERROR', '更新凭证失败', updateError))
     }
     
     revalidatePath('/[workspaceSlug]/providers')
     
-    return { success: true }
+    return Ok()
   } catch (error) {
     console.error('Error refreshing OAuth token:', error)
-    return { error: '刷新令牌失败' }
+    return Err(createError('INTERNAL_ERROR', '刷新令牌失败', error))
   }
 }
 
@@ -369,14 +370,14 @@ export async function refreshOAuthToken(credentialId: string) {
  * 初始化内置OAuth提供商
  * 为新工作空间创建内置的OAuth提供商
  */
-export async function initBuiltinOAuthProviders(workspaceId: string) {
+export async function initBuiltinOAuthProviders(workspaceId: string): Promise<Result<void, AppError>> {
   try {
     const supabase = await createClient()
     
     // 获取当前用户
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     if (userError || !user) {
-      return { error: '未登录' }
+      return Err(createError('AUTH_REQUIRED', '未登录'))
     }
     
     // 内置提供商配置（从BUILTIN_OAUTH_PROVIDERS获取）
@@ -411,9 +412,9 @@ export async function initBuiltinOAuthProviders(workspaceId: string) {
         })
     }
     
-    return { success: true }
+    return Ok()
   } catch (error) {
     console.error('Error initializing builtin providers:', error)
-    return { error: '初始化内置提供商失败' }
+    return Err(createError('INTERNAL_ERROR', '初始化内置提供商失败', error))
   }
 }

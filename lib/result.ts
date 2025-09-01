@@ -56,6 +56,7 @@ export interface AppError {
   code: ErrorCode
   message: string
   details?: unknown
+  name?: string  // 可选的错误名称
 }
 
 /**
@@ -110,5 +111,67 @@ export function isOk<T, E>(result: Result<T, E>): result is { success: true; dat
  */
 export function isErr<T, E>(result: Result<T, E>): result is { success: false; error: E } {
   return result.success === false
+}
+
+
+// ==================== Result 解包工具 ====================
+
+/**
+ * 解包 Result，成功时返回数据，失败时抛出带有 code 的 Error
+ * 用于 Server Components 中，会被错误边界捕获
+ */
+export async function unwrap<T>(
+  result: Promise<Result<T, AppError>> | Result<T, AppError>
+): Promise<T> {
+  const resolved = await result
+  if (!resolved.success) {
+    // 创建一个带有 code 属性的 Error，方便错误边界识别
+    const error = new Error(resolved.error.message) as Error & { 
+      code: ErrorCode; 
+      details?: unknown 
+    }
+    error.code = resolved.error.code
+    error.details = resolved.error.details
+    error.name = 'AppError'
+    throw error
+  }
+  return resolved.data as T
+}
+
+/**
+ * 解包 ResultWithRedirect，处理重定向
+ */
+export async function unwrapWithRedirect<T>(
+  result: Promise<ResultWithRedirect<T, AppError>> | ResultWithRedirect<T, AppError>
+): Promise<{ data: T | undefined; redirectTo?: string }> {
+  const resolved = await result
+  if (!resolved.success) {
+    const error = new Error(resolved.error.message) as Error & { 
+      code: ErrorCode; 
+      details?: unknown 
+    }
+    error.code = resolved.error.code
+    error.details = resolved.error.details
+    error.name = 'AppError'
+    throw error
+  }
+  return {
+    data: resolved.data,
+    redirectTo: resolved.redirectTo
+  }
+}
+
+/**
+ * 解包 Result 并返回默认值（失败时不抛出异常）
+ */
+export async function unwrapOr<T>(
+  result: Promise<Result<T, AppError>> | Result<T, AppError>,
+  defaultValue: T
+): Promise<T> {
+  try {
+    return await unwrap(result)
+  } catch {
+    return defaultValue
+  }
 }
 

@@ -3,6 +3,7 @@ import React from "react"
 import { getCurrentUser } from "@/lib/data/auth"
 import { getUserWorkspaces, getUserDefaultWorkspace } from "@/lib/data/workspace"
 import { WorkspaceLayoutClient } from "./layout-client"
+import { unwrap } from "@/lib/result"
 
 // 强制动态渲染，确保每次都获取最新数据
 export const dynamic = 'force-dynamic'
@@ -15,8 +16,8 @@ export default async function WorkspaceLayout({
   params: Promise<{ workspaceSlug?: string }>
 }) {
   const resolvedParams = await params
-  // 获取当前用户
-  const user = await getCurrentUser()
+  // 获取当前用户，失败时会抛出错误，被错误边界捕获
+  const user = await unwrap(getCurrentUser())
   
   // 未登录，重定向到登录页
   if (!user) {

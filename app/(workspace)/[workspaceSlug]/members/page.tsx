@@ -71,22 +71,27 @@ export default function MembersPage() {
   const loadMembers = async () => {
     if (!currentWorkspace) return
 
-    try {
-      setLoading(true)
-      const [activeMembers, pendingApplications] = await Promise.all([
-        getMembers(currentWorkspace.workspace.id, ['active']),
-        getMembers(currentWorkspace.workspace.id, ['pending'])
-      ])
+    setLoading(true)
+    const [activeResult, pendingResult] = await Promise.all([
+      getMembers(currentWorkspace.workspace.id, ['active']),
+      getMembers(currentWorkspace.workspace.id, ['pending'])
+    ])
 
-      setMembers(activeMembers)
-      setPendingMembers(pendingApplications)
-    } catch (error) {
-      console.error('Failed to load members:', error)
-      const msg = error instanceof Error ? error.message : '加载成员列表失败'
-      toast({ title: msg, variant: 'destructive' })
-    } finally {
-      setLoading(false)
+    if (activeResult.success) {
+      setMembers(activeResult.data)
+    } else {
+      console.error('Failed to load active members:', activeResult.error)
+      toast({ title: activeResult.error.message, variant: 'destructive' })
     }
+
+    if (pendingResult.success) {
+      setPendingMembers(pendingResult.data)
+    } else {
+      console.error('Failed to load pending members:', pendingResult.error)
+      toast({ title: pendingResult.error.message, variant: 'destructive' })
+    }
+    
+    setLoading(false)
   }
 
   const filteredMembers = members.filter((member) => {
@@ -103,56 +108,52 @@ export default function MembersPage() {
   const handleApproveApplication = async (membershipId: string) => {
     if (!currentWorkspace) return
 
-    try {
-      await approveMember(currentWorkspace.workspace.id, membershipId)
+    const result = await approveMember(currentWorkspace.workspace.id, membershipId)
+    if (result.success) {
       toast({ description: '已批准加入申请' })
       loadMembers()
-    } catch (error) {
-      console.error('Failed to approve member:', error)
-      const msg = error instanceof Error ? error.message : '批准申请失败'
-      toast({ title: msg, variant: 'destructive' })
+    } else {
+      console.error('Failed to approve member:', result.error)
+      toast({ title: result.error.message, variant: 'destructive' })
     }
   }
 
   const handleRejectApplication = async (membershipId: string) => {
     if (!currentWorkspace) return
 
-    try {
-      await rejectMember(currentWorkspace.workspace.id, membershipId)
+    const result = await rejectMember(currentWorkspace.workspace.id, membershipId)
+    if (result.success) {
       toast({ description: '已拒绝加入申请' })
       loadMembers()
-    } catch (error) {
-      console.error('Failed to reject member:', error)
-      const msg = error instanceof Error ? error.message : '拒绝申请失败'
-      toast({ title: msg, variant: 'destructive' })
+    } else {
+      console.error('Failed to reject member:', result.error)
+      toast({ title: result.error.message, variant: 'destructive' })
     }
   }
 
   const handleChangeRole = async (membershipId: string, newRole: Exclude<MemberRole, 'owner'>) => {
     if (!currentWorkspace) return
 
-    try {
-      await updateMemberRole(currentWorkspace.workspace.id, membershipId, newRole)
+    const result = await updateMemberRole(currentWorkspace.workspace.id, membershipId, newRole)
+    if (result.success) {
       toast({ description: '角色已更新' })
       loadMembers()
-    } catch (error) {
-      console.error('Failed to update role:', error)
-      const msg = error instanceof Error ? error.message : '更新角色失败'
-      toast({ title: msg, variant: 'destructive' })
+    } else {
+      console.error('Failed to update role:', result.error)
+      toast({ title: result.error.message, variant: 'destructive' })
     }
   }
 
   const handleRemoveMember = async (membershipId: string) => {
     if (!currentWorkspace) return
 
-    try {
-      const result = await removeMember(currentWorkspace.workspace.id, membershipId)
-      toast({ description: result.message || '成员已移除' })
+    const result = await removeMember(currentWorkspace.workspace.id, membershipId)
+    if (result.success) {
+      toast({ description: result.data.message || '成员已移除' })
       loadMembers()
-    } catch (error) {
-      console.error('Failed to remove member:', error)
-      const msg = error instanceof Error ? error.message : '移除成员失败'
-      toast({ title: msg, variant: 'destructive' })
+    } else {
+      console.error('Failed to remove member:', result.error)
+      toast({ title: result.error.message, variant: 'destructive' })
     }
   }
 

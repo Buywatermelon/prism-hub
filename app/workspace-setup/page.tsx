@@ -1,11 +1,12 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/data/auth"
 import { getUserDefaultWorkspace } from "@/lib/data/workspace"
+import { unwrap } from "@/lib/result"
 import WorkspaceSetupClient from "./client"
 
 export default async function WorkspaceSetupPage() {
-  // 获取当前用户
-  const user = await getCurrentUser()
+  // 获取当前用户，失败时会抛出错误
+  const user = await unwrap(getCurrentUser())
   
   // 未登录，重定向到登录页
   if (!user) {

@@ -1,24 +1,14 @@
 import { createClient } from "@/lib/supabase/server"
 import { User } from "@supabase/supabase-js"
-import { AuthenticationError } from "@/lib/errors"
+import { Result, Ok, Err, createError, AppError } from "@/lib/result"
 
-export async function getCurrentUser(): Promise<User | null> {
+export async function getCurrentUser(): Promise<Result<User | null, AppError>> {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   
-  if (error || !user) {
-    return null
+  if (error) {
+    return Err(createError('AUTH_FAILED', '获取用户信息失败'))
   }
   
-  return user
-}
-
-export async function requireAuth(): Promise<User> {
-  const user = await getCurrentUser()
-  
-  if (!user) {
-    throw new AuthenticationError()
-  }
-  
-  return user
+  return Ok(user)
 }

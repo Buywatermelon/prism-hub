@@ -1,14 +1,15 @@
 import { redirect } from "next/navigation"
 import { getCurrentUser } from "@/lib/data/auth"
 import { getUserDefaultWorkspace } from "@/lib/data/workspace"
+import { unwrapOr } from "@/lib/result"
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  // 检查用户是否已登录
-  const user = await getCurrentUser()
+  // 检查用户是否已登录，失败时返回 null
+  const user = await unwrapOr(getCurrentUser(), null)
   
   // 如果已登录，检查是否有工作空间
   if (user) {

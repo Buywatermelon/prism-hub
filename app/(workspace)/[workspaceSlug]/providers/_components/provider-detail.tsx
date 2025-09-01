@@ -56,11 +56,11 @@ export function ProviderDetail({
     setIsDeleting(true)
     try {
       const result = await deleteProvider(provider.id)
-      if (result.error) {
-        alert(result.error)
-      } else {
+      if (result.success) {
         onProviderDeleted(provider.id)
         setIsDeleteDialogOpen(false)
+      } else {
+        alert(result.error.message)
       }
     } finally {
       setIsDeleting(false)

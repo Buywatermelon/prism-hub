@@ -108,19 +108,19 @@ export function AddProviderDialog({
           config: editProvider.config || {},
         })
 
-        if (result.error) {
-          toast({
-            title: '更新失败',
-            description: result.error,
-            variant: 'destructive',
-          })
-        } else if (result.data) {
+        if (result.success) {
           toast({
             title: '更新成功',
             description: `供应商 ${result.data.name} 已更新`,
           })
           onProviderUpdated?.(result.data)
           setOpen(false)
+        } else {
+          toast({
+            title: '更新失败',
+            description: result.error.message,
+            variant: 'destructive',
+          })
         }
       } else {
         // 创建模式
@@ -135,13 +135,7 @@ export function AddProviderDialog({
           created_by: null,
         })
 
-        if (result.error) {
-          toast({
-            title: '创建失败',
-            description: result.error,
-            variant: 'destructive',
-          })
-        } else if (result.data) {
+        if (result.success) {
           toast({
             title: '创建成功',
             description: `供应商 ${result.data.name} 已添加`,
@@ -155,6 +149,12 @@ export function AddProviderDialog({
             endpoint: '',
             description: '',
             models: '',
+          })
+        } else {
+          toast({
+            title: '创建失败',
+            description: result.error.message,
+            variant: 'destructive',
           })
         }
       }

@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { defineAbilitiesFor, type PermissionContext, type AppAbility, type UserRole } from './abilities'
-import { AuthorizationError } from '@/lib/errors'
+import { Result, Ok, Err, createError, AppError } from '@/lib/result'
 
 /**
  * 获取用户在工作空间的权限上下文
@@ -77,10 +77,12 @@ export async function requirePermission(
   workspaceId: string,
   action: string,
   subject: string
-): Promise<void> {
+): Promise<Result<void, AppError>> {
   const ability = await getCurrentUserAbility(workspaceId)
   
   if (!ability || !ability.can(action as any, subject as any)) {
-    throw new AuthorizationError(`无法执行 ${action} 操作于 ${subject}`)
+    return Err(createError('PERMISSION_DENIED', `无法执行 ${action} 操作于 ${subject}`))
   }
+  
+  return Ok()
 }

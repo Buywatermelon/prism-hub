@@ -1,6 +1,7 @@
 import { getCurrentUser } from '@/lib/data/auth'
 import { getWorkspaceBySlug } from '@/lib/data/workspace'
 import { redirect } from 'next/navigation'
+import { unwrap } from '@/lib/result'
 import SettingsClient from './page.impl'
 
 // 强制动态渲染，确保每次都获取最新数据
@@ -12,7 +13,7 @@ export default async function SettingsPage({
   params: Promise<{ workspaceSlug: string }>
 }) {
   const { workspaceSlug } = await params
-  const user = await getCurrentUser()
+  const user = await unwrap(getCurrentUser())
   if (!user) {
     redirect('/login')
   }

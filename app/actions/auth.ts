@@ -118,17 +118,17 @@ export async function signUp(
 /**
  * 用户登出
  */
-export async function signOut() {
+export async function signOut(): Promise<ResultWithRedirect<void, AppError>> {
   const supabase = await createClient()
   
   const { error } = await supabase.auth.signOut()
   
   if (error) {
     console.error('Sign out error:', error)
-    throw new Error('登出失败，请稍后重试')
+    return Err(createError('AUTH_FAILED', '登出失败，请稍后重试'))
   }
 
-  redirect('/login')
+  return Redirect('/login')
 }
 
 /**

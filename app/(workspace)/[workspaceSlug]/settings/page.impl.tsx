@@ -49,22 +49,25 @@ export default function SettingsClient({ workspace }: SettingsClientProps) {
 
   const handleSave = async () => {
     setIsLoading(true)
-    try {
-      await updateWorkspaceAction(workspace.workspace.id, {
-        name: settings.name,
-        description: settings.description,
-        settings: { require_approval: settings.requireApproval },
-      })
+    const result = await updateWorkspaceAction(workspace.workspace.id, {
+      name: settings.name,
+      description: settings.description,
+      settings: { require_approval: settings.requireApproval },
+    })
 
+    if (result.success) {
       setInitialSettings(settings)
       setHasUnsavedChanges(false)
       toast({ description: '工作空间设置已更新' })
-    } catch (error) {
-      console.error('Failed to save settings:', error)
-      toast({ title: '保存设置失败', description: error instanceof Error ? error.message : undefined, variant: 'destructive' })
-    } finally {
-      setIsLoading(false)
+    } else {
+      console.error('Failed to save settings:', result.error)
+      toast({ 
+        title: '保存设置失败', 
+        description: result.error.message, 
+        variant: 'destructive' 
+      })
     }
+    setIsLoading(false)
   }
 
   return (

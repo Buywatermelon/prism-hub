@@ -2,7 +2,11 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { z } from 'zod'
-import { AuthenticationError, AuthorizationError, ValidationError, DatabaseError } from '@/lib/errors'
+import { Result, Ok, Err, createError } from '@/lib/result'
+import type { AppError } from '@/lib/result'
+import type { Database } from '@/types/database.types'
+
+type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row']
 
 const updateWorkspaceSchema = z.object({
   name: z.string().min(2).max(50).optional(),
@@ -17,16 +21,22 @@ const updateWorkspaceSchema = z.object({
 export async function updateWorkspace(
   workspaceId: string,
   input: { name?: string; description?: string | null; settings?: { require_approval?: boolean } }
-) {
+): Promise<Result<Tables<'workspaces'>, AppError>> {
   const supabase = await createClient()
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser()
-  if (authError || !user) throw new AuthenticationError()
+  if (authError || !user) {
+    return Err(createError('AUTH_REQUIRED', '请先登录'))
+  }
 
   const parsed = updateWorkspaceSchema.safeParse(input)
-  if (!parsed.success) throw new ValidationError('输入数据无效', parsed.error)
+  if (!parsed.success) {
+    return Err(createError('VALIDATION_ERROR', '输入数据无效', {
+      errors: parsed.error.flatten().fieldErrors,
+    }))
+  }
 
   const { name, description, settings } = parsed.data
 
@@ -38,7 +48,7 @@ export async function updateWorkspace(
     .eq('status', 'active')
     .single()
   if (!currentMembership || !['owner', 'admin'].includes(currentMembership.role as any)) {
-    throw new AuthorizationError('需要管理员或所有者权限')
+    return Err(createError('PERMISSION_DENIED', '需要管理员或所有者权限'))
   }
 
   const updates: any = { updated_at: new Date().toISOString() }
@@ -62,9 +72,9 @@ export async function updateWorkspace(
     .single()
   if (error || !workspace) {
     console.error('Failed to update workspace:', error)
-    throw new DatabaseError('更新工作空间失败', error)
+    return Err(createError('DATABASE_ERROR', '更新工作空间失败'))
   }
 
-  return { workspace }
+  return Ok(workspace)
 }
 

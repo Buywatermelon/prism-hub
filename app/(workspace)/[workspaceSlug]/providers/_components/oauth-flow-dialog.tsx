@@ -53,17 +53,17 @@ export function OAuthFlowDialog({
     try {
       const result = await generateOAuthURL(providerId, workspaceId)
       
-      if ('error' in result) {
+      if (!result.success) {
         toast({
           title: '生成授权链接失败',
-          description: result.error,
+          description: result.error.message,
           variant: 'destructive'
         })
         return
       }
       
-      setAuthUrl(result.url)
-      setAuthState(result.state)
+      setAuthUrl(result.data.url)
+      setAuthState(result.data.state)
       setStep(2)
     } catch (_error) {
       toast({
@@ -136,10 +136,10 @@ export function OAuthFlowDialog({
     try {
       const result = await exchangeOAuthCode(authCode, authState)
       
-      if ('error' in result) {
+      if (!result.success) {
         toast({
           title: '授权失败',
-          description: result.error,
+          description: result.error.message,
           variant: 'destructive'
         })
         return
@@ -149,7 +149,7 @@ export function OAuthFlowDialog({
       
       // 成功后延迟关闭对话框
       setTimeout(() => {
-        onSuccess?.(result.credential)
+        onSuccess?.(result.data.credential)
         handleClose()
         router.refresh()
       }, 1500)
