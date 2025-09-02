@@ -278,3 +278,42 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs(created_at DESC)
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs(action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_resource ON audit_logs(resource_type, resource_id);
 
+-- ==================== OpenRouter 模型数据表 ====================
+
+-- 创建 models 表来存储 OpenRouter 模型数据
+CREATE TABLE IF NOT EXISTS models (
+  id TEXT PRIMARY KEY,
+  canonical_slug TEXT,
+  hugging_face_id TEXT,
+  name TEXT NOT NULL,
+  created BIGINT,
+  description TEXT,
+  context_length INTEGER,
+  architecture JSONB,
+  pricing JSONB,
+  top_provider JSONB,
+  per_request_limits JSONB,
+  supported_parameters TEXT[],
+  last_synced_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+COMMENT ON TABLE models IS 'OpenRouter 模型数据表，存储可用的 AI 模型信息';
+COMMENT ON COLUMN models.id IS '模型唯一标识符';
+COMMENT ON COLUMN models.canonical_slug IS '模型规范化 slug';
+COMMENT ON COLUMN models.hugging_face_id IS 'Hugging Face 模型 ID';
+COMMENT ON COLUMN models.name IS '模型名称';
+COMMENT ON COLUMN models.created IS '模型创建时间戳';
+COMMENT ON COLUMN models.description IS '模型描述';
+COMMENT ON COLUMN models.context_length IS '上下文长度限制';
+COMMENT ON COLUMN models.architecture IS '模型架构信息，JSON 格式';
+COMMENT ON COLUMN models.pricing IS '模型定价信息，JSON 格式';
+COMMENT ON COLUMN models.top_provider IS '最佳供应商信息，JSON 格式';
+COMMENT ON COLUMN models.per_request_limits IS '每请求限制，JSON 格式';
+COMMENT ON COLUMN models.supported_parameters IS '支持的参数列表';
+COMMENT ON COLUMN models.last_synced_at IS '最后同步时间';
+
+-- 创建 models 表索引
+CREATE INDEX IF NOT EXISTS idx_models_name ON models(name);
+CREATE INDEX IF NOT EXISTS idx_models_canonical_slug ON models(canonical_slug);
+CREATE INDEX IF NOT EXISTS idx_models_last_synced ON models(last_synced_at);
+

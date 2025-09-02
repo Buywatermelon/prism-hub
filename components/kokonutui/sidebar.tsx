@@ -8,6 +8,7 @@ import {
   Building2,
   Brain,
   Key,
+  Database,
 } from "lucide-react"
 
 import { Home } from "lucide-react"
@@ -102,6 +103,9 @@ export default function Sidebar() {
                 <div className="space-y-1">
                   <NavItem href={`${prefix}/providers`} icon={Brain}>
                     供应商管理
+                  </NavItem>
+                  <NavItem href={`${prefix}/models`} icon={Database}>
+                    模型管理
                   </NavItem>
                   <NavItem href={`${prefix}/api-keys`} icon={Key}>
                     API 密钥
