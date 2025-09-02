@@ -189,26 +189,125 @@ export function ModelsList({ initialData, currentPage, searchTerm }: ModelsListP
                   />
                 </PaginationItem>
                 
-                {[...Array(Math.min(5, initialData.totalPages))].map((_, i) => {
-                  const page = i + 1
-                  return (
-                    <PaginationItem key={page}>
-                      <PaginationLink
-                        onClick={() => handlePageChange(page)}
-                        isActive={page === currentPage}
-                        className="cursor-pointer"
-                      >
-                        {page}
-                      </PaginationLink>
-                    </PaginationItem>
-                  )
-                })}
-                
-                {initialData.totalPages > 5 && (
-                  <PaginationItem>
-                    <PaginationEllipsis />
-                  </PaginationItem>
-                )}
+                {(() => {
+                  const pages = []
+                  const totalPages = initialData.totalPages
+                  
+                  // 如果总页数较少，全部显示
+                  if (totalPages <= 7) {
+                    for (let i = 1; i <= totalPages; i++) {
+                      pages.push(
+                        <PaginationItem key={i}>
+                          <PaginationLink
+                            onClick={() => handlePageChange(i)}
+                            isActive={i === currentPage}
+                            className="cursor-pointer w-10 justify-center"
+                          >
+                            {i}
+                          </PaginationLink>
+                        </PaginationItem>
+                      )
+                    }
+                  } else {
+                    // 固定7个槽位：保持组件宽度完全稳定
+                    // 槽位分配：1 + 省略号/页码 + 3个中间页码 + 省略号/页码 + 末页
+                    
+                    // 槽位1：第一页
+                    pages.push(
+                      <PaginationItem key={1}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(1)}
+                          isActive={currentPage === 1}
+                          className="cursor-pointer w-10 justify-center"
+                        >
+                          1
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                    
+                    if (currentPage <= 4) {
+                      // 靠近开头：1 2 3 4 5 ... 末页
+                      for (let i = 2; i <= 5; i++) {
+                        pages.push(
+                          <PaginationItem key={i}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(i)}
+                              isActive={i === currentPage}
+                              className="cursor-pointer w-10 justify-center"
+                            >
+                              {i}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      }
+                      pages.push(
+                        <PaginationItem key="ellipsis">
+                          <PaginationEllipsis className="w-10" />
+                        </PaginationItem>
+                      )
+                    } else if (currentPage >= totalPages - 3) {
+                      // 靠近结尾：1 ... 末-4 末-3 末-2 末-1 末页
+                      pages.push(
+                        <PaginationItem key="ellipsis">
+                          <PaginationEllipsis className="w-10" />
+                        </PaginationItem>
+                      )
+                      for (let i = totalPages - 4; i < totalPages; i++) {
+                        pages.push(
+                          <PaginationItem key={i}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(i)}
+                              isActive={i === currentPage}
+                              className="cursor-pointer w-10 justify-center"
+                            >
+                              {i}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      }
+                    } else {
+                      // 在中间：1 ... 当前-1 当前 当前+1 ... 末页
+                      pages.push(
+                        <PaginationItem key="ellipsis-start">
+                          <PaginationEllipsis className="w-10" />
+                        </PaginationItem>
+                      )
+                      for (let i = currentPage - 1; i <= currentPage + 1; i++) {
+                        pages.push(
+                          <PaginationItem key={i}>
+                            <PaginationLink
+                              onClick={() => handlePageChange(i)}
+                              isActive={i === currentPage}
+                              className="cursor-pointer w-10 justify-center"
+                            >
+                              {i}
+                            </PaginationLink>
+                          </PaginationItem>
+                        )
+                      }
+                      pages.push(
+                        <PaginationItem key="ellipsis-end">
+                          <PaginationEllipsis className="w-10" />
+                        </PaginationItem>
+                      )
+                    }
+                    
+                    // 槽位7：最后一页
+                    pages.push(
+                      <PaginationItem key={totalPages}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(totalPages)}
+                          isActive={currentPage === totalPages}
+                          className="cursor-pointer w-10 justify-center"
+                        >
+                          {totalPages}
+                        </PaginationLink>
+                      </PaginationItem>
+                    )
+                  }
+                  
+                  return pages
+                })()}
                 
                 <PaginationItem>
                   <PaginationNext
