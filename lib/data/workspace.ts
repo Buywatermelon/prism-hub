@@ -33,7 +33,7 @@ export async function getUserWorkspaces(userId: string): Promise<WorkspaceMember
   }
   
   return data.map(item => ({
-    workspace: item.workspace as Workspace,
+    workspace: item.workspace as unknown as Workspace,
     membership: {
       id: item.id,
       workspace_id: item.workspace_id,
@@ -46,7 +46,7 @@ export async function getUserWorkspaces(userId: string): Promise<WorkspaceMember
       approved_by: item.approved_by,
       invited_by: item.invited_by,
       permissions: item.permissions,
-      preferences: item.preferences,
+      preferences: (item.preferences || {}) as unknown as WorkspaceMemberPreferences,
       reject_reason: item.reject_reason,
     } as WorkspaceMember
   }))
@@ -71,7 +71,7 @@ export async function getWorkspaceBySlug(slug: string, userId: string): Promise<
   }
   
   return {
-    workspace: data.workspace as Workspace,
+    workspace: data.workspace as unknown as Workspace,
     membership: {
       id: data.id,
       workspace_id: data.workspace_id,
@@ -84,7 +84,7 @@ export async function getWorkspaceBySlug(slug: string, userId: string): Promise<
       approved_by: data.approved_by,
       invited_by: data.invited_by,
       permissions: data.permissions,
-      preferences: data.preferences,
+      preferences: (data.preferences || {}) as unknown as WorkspaceMemberPreferences,
       reject_reason: data.reject_reason,
     } as WorkspaceMember
   }

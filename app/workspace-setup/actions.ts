@@ -70,7 +70,7 @@ export async function createWorkspace(
       slug,
       description,
       join_code: joinCode,
-      settings: { require_approval: false },
+      settings: { require_approval: true },  // 默认需要审批
       created_by: user.id,
     })
     .select()

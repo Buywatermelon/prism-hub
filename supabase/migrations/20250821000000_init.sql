@@ -132,7 +132,7 @@ CREATE TABLE IF NOT EXISTS user_api_keys (
   workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE NOT NULL,
   user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
   key_hash text NOT NULL UNIQUE,
-  key_prefix text NOT NULL,
+  encrypted_key text NOT NULL,
   description text,
   last_used_at timestamptz,
   expires_at timestamptz,
@@ -144,8 +144,8 @@ CREATE TABLE IF NOT EXISTS user_api_keys (
 COMMENT ON TABLE user_api_keys IS '用户 API 密钥表，用于访问 Claude Relay API';
 COMMENT ON COLUMN user_api_keys.workspace_id IS '所属工作空间 ID';
 COMMENT ON COLUMN user_api_keys.user_id IS '所属用户 ID';
-COMMENT ON COLUMN user_api_keys.key_hash IS 'API 密钥哈希值，用于验证';
-COMMENT ON COLUMN user_api_keys.key_prefix IS 'API 密钥前缀，用于显示';
+COMMENT ON COLUMN user_api_keys.key_hash IS 'API密钥的SHA256哈希值，用于快速验证';
+COMMENT ON COLUMN user_api_keys.encrypted_key IS 'AES加密的完整API密钥，用于显示给用户';
 COMMENT ON COLUMN user_api_keys.description IS 'API 密钥描述';
 COMMENT ON COLUMN user_api_keys.last_used_at IS '最后使用时间';
 COMMENT ON COLUMN user_api_keys.expires_at IS '过期时间，NULL 表示永不过期';

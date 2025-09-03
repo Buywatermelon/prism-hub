@@ -16,11 +16,6 @@ const updateWorkspaceSchema = z.object({
       require_approval: z.boolean().optional(),
     })
     .optional(),
-  preferences: z
-    .object({
-      model_priority: z.array(z.string().uuid()).optional(),
-    })
-    .optional(),
 })
 
 export async function updateWorkspace(
@@ -29,7 +24,6 @@ export async function updateWorkspace(
     name?: string; 
     description?: string | null; 
     settings?: { require_approval?: boolean };
-    preferences?: { model_priority?: string[] }
   }
 ): Promise<Result<Tables<'workspaces'>, AppError>> {
   const supabase = await createClient()
@@ -48,7 +42,7 @@ export async function updateWorkspace(
     }))
   }
 
-  const { name, description, settings, preferences } = parsed.data
+  const { name, description, settings } = parsed.data
 
   const { data: currentMembership } = await supabase
     .from('workspace_members')
@@ -72,19 +66,6 @@ export async function updateWorkspace(
       .eq('id', workspaceId)
       .single()
     updates.settings = { ...(currentWorkspace?.settings as Record<string, any> || {}), ...settings }
-  }
-
-  if (preferences) {
-    const { data: currentWorkspace } = await supabase
-      .from('workspaces')
-      .select('preferences')
-      .eq('id', workspaceId)
-      .single()
-    updates.preferences = { 
-      ...(currentWorkspace?.preferences as Record<string, any> || {}), 
-      ...preferences,
-      last_updated: new Date().toISOString()
-    }
   }
 
   const { data: workspace, error } = await supabase

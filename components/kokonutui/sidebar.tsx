@@ -5,10 +5,10 @@ import {
   Users2,
   HelpCircle,
   Menu,
-  Building2,
-  Brain,
-  Key,
+  Settings,
+  Boxes,
   Database,
+  Sliders,
 } from "lucide-react"
 
 import { Home } from "lucide-react"
@@ -101,14 +101,14 @@ export default function Sidebar() {
                   AI 配置
                 </div>
                 <div className="space-y-1">
-                  <NavItem href={`${prefix}/providers`} icon={Brain}>
+                  <NavItem href={`${prefix}/providers`} icon={Boxes}>
                     供应商管理
                   </NavItem>
                   <NavItem href={`${prefix}/models`} icon={Database}>
                     模型管理
                   </NavItem>
-                  <NavItem href={`${prefix}/api-keys`} icon={Key}>
-                    API 密钥
+                  <NavItem href={`${prefix}/preferences`} icon={Sliders}>
+                    模型偏好
                   </NavItem>
                 </div>
               </div>
@@ -118,7 +118,7 @@ export default function Sidebar() {
                   工作空间管理
                 </div>
                 <div className="space-y-1">
-                  <NavItem href={`${prefix}/settings`} icon={Building2}>
+                  <NavItem href={`${prefix}/settings`} icon={Settings}>
                     设置
                   </NavItem>
                   <NavItem href={`${prefix}/members`} icon={Users2}>

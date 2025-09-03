@@ -93,6 +93,54 @@ export type Database = {
         Update: {}
         Relationships: []
       }
+      models: {
+        Row: {
+          architecture: Json | null
+          canonical_slug: string | null
+          context_length: number | null
+          created: number | null
+          description: string | null
+          hugging_face_id: string | null
+          id: string
+          last_synced_at: string | null
+          name: string
+          per_request_limits: Json | null
+          pricing: Json | null
+          supported_parameters: string[] | null
+          top_provider: Json | null
+        }
+        Insert: {
+          architecture?: Json | null
+          canonical_slug?: string | null
+          context_length?: number | null
+          created?: number | null
+          description?: string | null
+          hugging_face_id?: string | null
+          id: string
+          last_synced_at?: string | null
+          name: string
+          per_request_limits?: Json | null
+          pricing?: Json | null
+          supported_parameters?: string[] | null
+          top_provider?: Json | null
+        }
+        Update: {
+          architecture?: Json | null
+          canonical_slug?: string | null
+          context_length?: number | null
+          created?: number | null
+          description?: string | null
+          hugging_face_id?: string | null
+          id?: string
+          last_synced_at?: string | null
+          name?: string
+          per_request_limits?: Json | null
+          pricing?: Json | null
+          supported_parameters?: string[] | null
+          top_provider?: Json | null
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           action: string
@@ -318,10 +366,10 @@ export type Database = {
         Row: {
           created_at: string
           description: string | null
+          encrypted_key: string
           expires_at: string | null
           id: string
           key_hash: string
-          key_prefix: string
           last_used_at: string | null
           scopes: Json
           user_id: string
@@ -330,10 +378,10 @@ export type Database = {
         Insert: {
           created_at?: string
           description?: string | null
+          encrypted_key: string
           expires_at?: string | null
           id?: string
           key_hash: string
-          key_prefix: string
           last_used_at?: string | null
           scopes?: Json
           user_id: string
@@ -342,10 +390,10 @@ export type Database = {
         Update: {
           created_at?: string
           description?: string | null
+          encrypted_key?: string
           expires_at?: string | null
           id?: string
           key_hash?: string
-          key_prefix?: string
           last_used_at?: string | null
           scopes?: Json
           user_id?: string
