@@ -13,7 +13,6 @@ import type {
   WorkspaceMemberPreferences
 } from '@/types/preferences.types'
 import { 
-  parseModelId,
   buildModelId,
   isValidModelId,
   createDefaultPreferences
@@ -25,6 +24,16 @@ import {
   getProviderDisplayName 
 } from '@/lib/utils/model-definitions'
 
+// 辅助函数：获取并验证用户
+async function getAuthUser() {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user) {
+    return null
+  }
+  return { user, supabase }
+}
+
 /**
  * 获取工作空间所有可用的模型
  * 包括API密钥模型和OAuth模型
@@ -32,13 +41,9 @@ import {
 export async function getAllAvailableModels(
   workspaceId: string
 ): Promise<Result<ModelInfo[], AppError>> {
-  const supabase = await createClient()
-  
-  // 获取当前用户
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return Err(createError('AUTH_REQUIRED', '请先登录'))
-  }
+  const auth = await getAuthUser()
+  if (!auth) return Err(createError('AUTH_REQUIRED', '请先登录'))
+  const { supabase } = auth
 
   // 查询工作空间的所有供应商及其凭证
   const { data: providers, error: providersError } = await supabase
@@ -133,14 +138,12 @@ export async function getScenarioPreferences(
   scenario: ScenarioType,
   userId?: string
 ): Promise<Result<PreferencesResponse, AppError>> {
-  const supabase = await createClient()
+  const auth = await getAuthUser()
+  if (!auth) return Err(createError('AUTH_REQUIRED', '请先登录'))
+  const { user, supabase } = auth
   
-  // 获取当前用户（如果没有提供userId）
+  // 如果没有提供userId，使用当前用户
   if (!userId) {
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return Err(createError('AUTH_REQUIRED', '请先登录'))
-    }
     userId = user.id
   }
 
@@ -206,13 +209,9 @@ export async function saveScenarioPreferences(
   scope: 'workspace' | 'member',
   userId?: string
 ): Promise<Result<void, AppError>> {
-  const supabase = await createClient()
-  
-  // 获取当前用户
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return Err(createError('AUTH_REQUIRED', '请先登录'))
-  }
+  const auth = await getAuthUser()
+  if (!auth) return Err(createError('AUTH_REQUIRED', '请先登录'))
+  const { user, supabase } = auth
 
   // 验证模型ID格式
   for (const modelId of modelIds) {
@@ -310,13 +309,9 @@ export async function resetMemberPreferences(
   userId: string,
   scenario?: ScenarioType
 ): Promise<Result<void, AppError>> {
-  const supabase = await createClient()
-  
-  // 获取当前用户
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return Err(createError('AUTH_REQUIRED', '请先登录'))
-  }
+  const auth = await getAuthUser()
+  if (!auth) return Err(createError('AUTH_REQUIRED', '请先登录'))
+  const { user, supabase } = auth
 
   // 只能重置自己的偏好（除非是管理员）
   if (userId !== user.id) {
